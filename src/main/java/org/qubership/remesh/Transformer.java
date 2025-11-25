@@ -3,9 +3,15 @@ package org.qubership.remesh;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.error.MarkedYAMLException;
 
 @Slf4j
 public class Transformer {
@@ -14,12 +20,44 @@ public class Transformer {
         try (Stream<Path> stream = Files.walk(dir)) {
             stream.filter(Files::isRegularFile)
                     .filter(this::isYaml)
-                    .forEach(p -> log.info("Found file: {}", p.toAbsolutePath()));
+                    .forEach(this::processFile);
         }
     }
 
     private boolean isYaml(Path p) {
         String name = p.getFileName().toString().toLowerCase();
         return name.endsWith(".yaml") || name.endsWith(".yml");
+    }
+
+    private void processFile(Path file) {
+        log.info("Found file: {}", file.toAbsolutePath());
+        try (InputStream inputStream = Files.newInputStream(file)) {
+            Yaml yaml = new Yaml();
+            AtomicInteger fragmentCounter = new AtomicInteger();
+            AtomicInteger routeCounter = new AtomicInteger();
+            for (Object doc : yaml.loadAll(inputStream)) {
+                int current = fragmentCounter.incrementAndGet();
+                if (doc instanceof Map<?, ?> fragmentMap) {
+                    Object kind = fragmentMap.get("kind");
+                    if ("RouteConfiguration".equals(kind)) {
+                        int routeIdx = routeCounter.incrementAndGet();
+                        log.info("RouteConfiguration fragment #{} in {}:\n{}", routeIdx, file.toAbsolutePath(), yaml.dump(doc));
+                    } else {
+                        log.info("Skipping fragment #{} in {} with kind {}", current, file.toAbsolutePath(), kind);
+                    }
+                } else {
+                    log.info("Skipping fragment #{} in {} because content is not a mapping", current, file.toAbsolutePath());
+                }
+            }
+            if (fragmentCounter.get() == 0) {
+                log.info("No fragments found in {}", file.toAbsolutePath());
+            } else if (routeCounter.get() == 0) {
+                log.info("No RouteConfiguration fragments found in {}", file.toAbsolutePath());
+            }
+        } catch (MarkedYAMLException e) {
+            log.error("Failed to parse YAML file {}", file.toAbsolutePath(), e);
+        } catch (IOException e) {
+            log.error("Failed to read file {}", file.toAbsolutePath(), e);
+        }
     }
 }
