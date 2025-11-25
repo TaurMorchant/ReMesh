@@ -1,6 +1,9 @@
 package org.qubership.remesh;
 
 import lombok.extern.slf4j.Slf4j;
+import org.qubership.remesh.handler.RouteConfigurationHandler;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.error.MarkedYAMLException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -9,9 +12,6 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
-
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.error.MarkedYAMLException;
 
 @Slf4j
 public class Transformer {
@@ -34,14 +34,22 @@ public class Transformer {
         try (InputStream inputStream = Files.newInputStream(file)) {
             Yaml yaml = new Yaml();
             AtomicInteger fragmentCounter = new AtomicInteger();
-            AtomicInteger routeCounter = new AtomicInteger();
             for (Object doc : yaml.loadAll(inputStream)) {
                 int current = fragmentCounter.incrementAndGet();
                 if (doc instanceof Map<?, ?> fragmentMap) {
                     Object kind = fragmentMap.get("kind");
                     if ("RouteConfiguration".equals(kind)) {
-                        int routeIdx = routeCounter.incrementAndGet();
-                        log.info("RouteConfiguration fragment #{} in {}:\n{}", routeIdx, file.toAbsolutePath(), yaml.dump(doc));
+                        Object spec = fragmentMap.get("spec");
+                        if (spec == null) {
+                            log.warn("RouteConfiguration fragment in {} has no spec section", file.toAbsolutePath());
+                            continue;
+                        }
+                        try {
+                            String specDump = yaml.dump(spec);
+                            new RouteConfigurationHandler().handle(specDump);
+                        } catch (Exception e) {
+                            log.error("Failed to parse spec for RouteConfiguration fragment in {}", file.toAbsolutePath(), e);
+                        }
                     } else {
                         log.info("Skipping fragment #{} in {} with kind {}", current, file.toAbsolutePath(), kind);
                     }
@@ -51,8 +59,6 @@ public class Transformer {
             }
             if (fragmentCounter.get() == 0) {
                 log.info("No fragments found in {}", file.toAbsolutePath());
-            } else if (routeCounter.get() == 0) {
-                log.info("No RouteConfiguration fragments found in {}", file.toAbsolutePath());
             }
         } catch (MarkedYAMLException e) {
             log.error("Failed to parse YAML file {}", file.toAbsolutePath(), e);
