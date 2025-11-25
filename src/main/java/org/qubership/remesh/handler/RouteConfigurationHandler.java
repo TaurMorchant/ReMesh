@@ -43,11 +43,16 @@ public class RouteConfigurationHandler implements CrHandler {
         return "RouteConfiguration";
     }
 
-    public void handle(String specDump) {
+    public void handle(String specDump, String metadataDump) {
         RoutingConfigRequestV3 routingConfig = routingConfigYaml.load(specDump);
         if (routingConfig == null) {
             log.warn("Failed to parse RouteConfiguration fragment");
             return;
+        }
+
+        Map<String, Object> metadata = metadataDump != null ? new Yaml().load(metadataDump) : Map.of();
+        if (routingConfig.getNamespace() == null && metadata.get("namespace") instanceof String namespace) {
+            routingConfig.setNamespace(namespace);
         }
 
         List<Map<String, Object>> manifests = new ArrayList<>();

@@ -40,13 +40,15 @@ public class Transformer {
                     Object kind = fragmentMap.get("kind");
                     if ("RouteConfiguration".equals(kind)) {
                         Object spec = fragmentMap.get("spec");
+                        Object metadata = fragmentMap.get("metadata");
                         if (spec == null) {
                             log.warn("RouteConfiguration fragment in {} has no spec section", file.toAbsolutePath());
                             continue;
                         }
                         try {
                             String specDump = yaml.dump(spec);
-                            new RouteConfigurationHandler().handle(specDump);
+                            String metadataDump = metadata != null ? yaml.dump(metadata) : null;
+                            new RouteConfigurationHandler().handle(specDump, metadataDump);
                         } catch (Exception e) {
                             log.error("Failed to parse spec for RouteConfiguration fragment in {}", file.toAbsolutePath(), e);
                         }
