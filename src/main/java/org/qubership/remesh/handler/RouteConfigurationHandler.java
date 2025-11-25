@@ -400,15 +400,30 @@ public class RouteConfigurationHandler implements CrHandler {
         if (endpoint == null || endpoint.isBlank()) {
             return new Endpoint(null, null);
         }
-        try {
-            URI uri = endpoint.contains("://") ? new URI(endpoint) : new URI("//" + endpoint);
-            String host = uri.getHost();
-            int port = uri.getPort();
-            return new Endpoint(host, port >= 0 ? port : null);
-        } catch (URISyntaxException e) {
-            log.warn("Failed to parse endpoint {}", endpoint, e);
-            return new Endpoint(endpoint, null);
+        String withoutScheme = endpoint;
+        int schemeIndex = endpoint.indexOf("://");
+        if (schemeIndex >= 0) {
+            withoutScheme = endpoint.substring(schemeIndex + 3);
         }
+
+        int pathIndex = withoutScheme.indexOf('/') >= 0 ? withoutScheme.indexOf('/') : withoutScheme.length();
+        String hostPort = withoutScheme.substring(0, pathIndex);
+
+        Integer port = null;
+        int lastColon = hostPort.lastIndexOf(':');
+        if (lastColon > 0 && lastColon < hostPort.length() - 1) {
+            String portCandidate = hostPort.substring(lastColon + 1);
+            if (portCandidate.chars().allMatch(Character::isDigit)) {
+                try {
+                    port = Integer.parseInt(portCandidate);
+                    hostPort = hostPort.substring(0, lastColon);
+                } catch (NumberFormatException ignored) {
+                    // keep original host and null port when parsing fails
+                }
+            }
+        }
+
+        return new Endpoint(hostPort.isBlank() ? null : hostPort, port);
     }
 
     private void writeManifests(List<Map<String, Object>> manifests) {
