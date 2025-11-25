@@ -1,7 +1,7 @@
 package org.qubership.remesh;
 
 import lombok.extern.slf4j.Slf4j;
-import org.qubership.remesh.handler.RouteConfigurationHandler;
+import org.qubership.remesh.handler.RouteConfigurationHandler2;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.error.MarkedYAMLException;
 
@@ -48,7 +48,7 @@ public class Transformer {
                         try {
                             String specDump = yaml.dump(spec);
                             String metadataDump = metadata != null ? yaml.dump(metadata) : null;
-                            new RouteConfigurationHandler().handle(specDump, metadataDump);
+                            new RouteConfigurationHandler2().handle(specDump, metadataDump);
                         } catch (Exception e) {
                             log.error("Failed to parse spec for RouteConfiguration fragment in {}", file.toAbsolutePath(), e);
                         }
