@@ -5,7 +5,8 @@ import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import lombok.extern.slf4j.Slf4j;
-import org.qubership.remesh.handler.RouteConfigurationHandler;
+import org.qubership.remesh.handler.CrHandler;
+import org.qubership.remesh.handler.CrHandlerRegistry;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,8 +45,12 @@ public class Transformer {
                     continue;
                 }
 
-                if ("RouteConfiguration".equals(kindNode.asText())) {
-                    new RouteConfigurationHandler().handle(node, Path.of(outputFile));
+                CrHandler handler = CrHandlerRegistry.get(kindNode.asText());
+                if (handler == null) {
+                    log.warn("Handler not found for kind {}", kindNode.asText());
+                }
+                else {
+                    handler.handle(node, Path.of(outputFile));
                 }
             }
         } catch (IOException e) {

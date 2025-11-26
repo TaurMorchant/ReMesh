@@ -14,9 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
-/**
- * Пример трансформации старого RouteConfiguration в HTTPRoute (Gateway API).
- */
 public class RouteConfigurationHandler implements CrHandler {
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory())
@@ -57,7 +54,7 @@ public class RouteConfigurationHandler implements CrHandler {
         HttpRoute hr = new HttpRoute();
 
         HttpRoute.ObjectMeta md = new HttpRoute.ObjectMeta();
-        md.setName(safeName(old.getMetadata(), vs));
+        md.setName(safeName(old.getMetadata()));
         if (old.getMetadata() != null) {
             md.setNamespace(old.getMetadata().getNamespace());
         }
@@ -188,10 +185,7 @@ public class RouteConfigurationHandler implements CrHandler {
         return hr;
     }
 
-    private static String safeName(Metadata meta, VirtualService vs) {
-//        if (vs != null && vs.getName() != null && !vs.getName().isEmpty()) {
-//            return vs.getName();
-//        }
+    private static String safeName(Metadata meta) {
         if (meta != null && meta.getName() != null && !meta.getName().isEmpty()) {
             return meta.getName() + "-http-route";
         }
