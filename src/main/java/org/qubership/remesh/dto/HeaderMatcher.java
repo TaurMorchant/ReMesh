@@ -7,7 +7,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class HeaderMatcher {
     private String name;
-    private String value;
-    private Boolean regex;
-    private Boolean invertMatch;
+    private String exactMatch;
+    private String safeRegexMatch;
+    RangeMatch     rangeMatch;
+    private boolean presentMatch;
+    private String prefixMatch;
+    private String suffixMatch;
+    private boolean invertMatch;
 }

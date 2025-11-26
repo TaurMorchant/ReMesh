@@ -1,26 +1,28 @@
 package org.qubership.remesh;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import lombok.extern.slf4j.Slf4j;
-import org.qubership.remesh.handler.RouteConfigurationHandler2;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.error.MarkedYAMLException;
+import org.qubership.remesh.handler.RouteConfigurationHandler;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 @Slf4j
 public class Transformer {
+    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
+
     public void transform(Path dir) throws IOException {
         log.info("Transforming in dir {}", dir);
         try (Stream<Path> stream = Files.walk(dir)) {
             stream.filter(Files::isRegularFile)
                     .filter(this::isYaml)
-                    .forEach(this::processFile);
+                    .forEach(this::processFile2);
         }
     }
 
@@ -29,43 +31,25 @@ public class Transformer {
         return name.endsWith(".yaml") || name.endsWith(".yml");
     }
 
-    private void processFile(Path file) {
-        log.info("Found file: {}", file.toAbsolutePath());
-        try (InputStream inputStream = Files.newInputStream(file)) {
-            Yaml yaml = new Yaml();
-            AtomicInteger fragmentCounter = new AtomicInteger();
-            for (Object doc : yaml.loadAll(inputStream)) {
-                int current = fragmentCounter.incrementAndGet();
-                if (doc instanceof Map<?, ?> fragmentMap) {
-                    Object kind = fragmentMap.get("kind");
-                    if ("RouteConfiguration".equals(kind)) {
-                        Object spec = fragmentMap.get("spec");
-                        Object metadata = fragmentMap.get("metadata");
-                        if (spec == null) {
-                            log.warn("RouteConfiguration fragment in {} has no spec section", file.toAbsolutePath());
-                            continue;
-                        }
-                        try {
-                            String specDump = yaml.dump(spec);
-                            String metadataDump = metadata != null ? yaml.dump(metadata) : null;
-                            new RouteConfigurationHandler2().handle(specDump, metadataDump);
-                        } catch (Exception e) {
-                            log.error("Failed to parse spec for RouteConfiguration fragment in {}", file.toAbsolutePath(), e);
-                        }
-                    } else {
-                        log.info("Skipping fragment #{} in {} with kind {}", current, file.toAbsolutePath(), kind);
-                    }
-                } else {
-                    log.info("Skipping fragment #{} in {} because content is not a mapping", current, file.toAbsolutePath());
+    private void processFile2(Path file) {
+        String outputFile = file.getFileName().toString() + "_new";
+        log.info("output file {}", outputFile);
+        try (InputStream is = Files.newInputStream(file)) {
+            MappingIterator<JsonNode> it = YAML.readerFor(JsonNode.class).readValues(is);
+
+            while (it.hasNext()) {
+                JsonNode node = it.next();
+                JsonNode kindNode = node.get("kind");
+                if (kindNode == null) {
+                    continue;
+                }
+
+                if ("RouteConfiguration".equals(kindNode.asText())) {
+                    new RouteConfigurationHandler().handle(node, Path.of(outputFile));
                 }
             }
-            if (fragmentCounter.get() == 0) {
-                log.info("No fragments found in {}", file.toAbsolutePath());
-            }
-        } catch (MarkedYAMLException e) {
-            log.error("Failed to parse YAML file {}", file.toAbsolutePath(), e);
         } catch (IOException e) {
-            log.error("Failed to read file {}", file.toAbsolutePath(), e);
+            throw new RuntimeException(e);
         }
     }
 }

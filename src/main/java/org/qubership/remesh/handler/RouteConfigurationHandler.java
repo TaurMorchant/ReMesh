@@ -1,443 +1,261 @@
 package org.qubership.remesh.handler;
 
-import lombok.extern.slf4j.Slf4j;
-import org.qubership.remesh.dto.CircuitBreaker;
-import org.qubership.remesh.dto.Cookie;
-import org.qubership.remesh.dto.HeaderDefinition;
-import org.qubership.remesh.dto.HeaderMatcher;
-import org.qubership.remesh.dto.RouteConfig;
-import org.qubership.remesh.dto.RouteDestination;
-import org.qubership.remesh.dto.RouteMatch;
-import org.qubership.remesh.dto.RouteV3;
-import org.qubership.remesh.dto.RoutingConfigRequestV3;
-import org.qubership.remesh.dto.Rule;
-import org.qubership.remesh.dto.StatefulSession;
-import org.qubership.remesh.dto.TcpKeepalive;
-import org.qubership.remesh.dto.VirtualService;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.Constructor;
-import org.yaml.snakeyaml.introspector.PropertyUtils;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import org.qubership.remesh.dto.*;
+import org.qubership.remesh.dto.gatewayapi.HttpRoute;
+import org.qubership.remesh.util.EndpointDTO;
+import org.qubership.remesh.util.EndpointParser;
 
-import java.io.IOException;
 import java.io.Writer;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
 
-@Slf4j
+/**
+ * Пример трансформации старого RouteConfiguration в HTTPRoute (Gateway API).
+ */
 public class RouteConfigurationHandler implements CrHandler {
-    private static final Yaml routingConfigYaml = createRoutingConfigYaml();
+
+    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory())
+            .setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
     @Override
     public String getKind() {
         return "RouteConfiguration";
     }
 
-    public void handle(String specDump, String metadataDump) {
-        RoutingConfigRequestV3 routingConfig = routingConfigYaml.load(specDump);
-        if (routingConfig == null) {
-            log.warn("Failed to parse RouteConfiguration fragment");
-            return;
-        }
+    @Override
+    public void handle(JsonNode node, Path outputFile) {
+        try {
+            RouteConfigurationYaml old = YAML.treeToValue(node, RouteConfigurationYaml.class);
 
-        Map<String, Object> metadata = metadataDump != null ? new Yaml().load(metadataDump) : Map.of();
-        if (routingConfig.getNamespace() == null && metadata.get("namespace") instanceof String namespace) {
-            routingConfig.setNamespace(namespace);
-        }
+            List<HttpRoute> httpRoutes = new ArrayList<>();
 
-        List<Map<String, Object>> manifests = new ArrayList<>();
-        List<VirtualService> virtualServices = Optional.ofNullable(routingConfig.getVirtualServices()).orElse(List.of());
-
-        for (VirtualService virtualService : virtualServices) {
-            manifests.add(buildVirtualService(virtualService, routingConfig));
-            RouteConfig routeConfiguration = virtualService.getRouteConfiguration();
-            List<RouteV3> routes = routeConfiguration != null ? Optional.ofNullable(routeConfiguration.getRoutes()).orElse(List.of()) : List.of();
-            AtomicInteger destinationCounter = new AtomicInteger();
-
-            for (RouteV3 route : routes) {
-                int index = destinationCounter.incrementAndGet();
-                String suffix = "-" + index;
-                manifests.add(buildDestinationRule(virtualService, routingConfig, route, suffix));
-                buildServiceEntry(virtualService, routingConfig, route, suffix).ifPresent(manifests::add);
-            }
-        }
-
-        writeManifests(manifests);
-        log.info("Generated {} Istio manifest(s) from RouteConfiguration", manifests.size());
-    }
-
-    private static Yaml createRoutingConfigYaml() {
-        LoaderOptions loaderOptions = new LoaderOptions();
-        Constructor constructor = new Constructor(RoutingConfigRequestV3.class, loaderOptions);
-        PropertyUtils propertyUtils = new PropertyUtils();
-        propertyUtils.setSkipMissingProperties(true);
-        constructor.setPropertyUtils(propertyUtils);
-        return new Yaml(constructor);
-    }
-
-    private static Yaml outputYaml() {
-        DumperOptions dumperOptions = new DumperOptions();
-        dumperOptions.setPrettyFlow(true);
-        dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-        dumperOptions.setDefaultScalarStyle(DumperOptions.ScalarStyle.PLAIN);
-        dumperOptions.setIndent(2);
-        return new Yaml(dumperOptions);
-    }
-
-    private Map<String, Object> buildVirtualService(VirtualService virtualService,
-                                                    RoutingConfigRequestV3 routingConfig) {
-        Map<String, Object> vs = new LinkedHashMap<>();
-        vs.put("apiVersion", "networking.istio.io/v1beta1");
-        vs.put("kind", "VirtualService");
-
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("name", virtualService.getName());
-        metadata.put("namespace", routingConfig.getNamespace());
-        vs.put("metadata", metadata);
-
-        Map<String, Object> spec = new LinkedHashMap<>();
-        spec.put("hosts", Optional.ofNullable(virtualService.getHosts()).orElse(List.of()));
-        spec.put("gateways", Optional.ofNullable(routingConfig.getGateways()).orElse(List.of()));
-
-        List<Map<String, Object>> httpRoutes = new ArrayList<>();
-        RouteConfig routeConfiguration = virtualService.getRouteConfiguration();
-        List<RouteV3> routes = routeConfiguration != null ? Optional.ofNullable(routeConfiguration.getRoutes()).orElse(List.of()) : List.of();
-
-        for (RouteV3 route : routes) {
-            RouteDestination destination = route.getDestination();
-            List<Rule> rules = Optional.ofNullable(route.getRules()).orElse(List.of());
-            for (Rule rule : rules) {
-                httpRoutes.add(buildHttpRoute(rule, destination, virtualService));
-            }
-        }
-
-        spec.put("http", httpRoutes);
-        vs.put("spec", spec);
-        return vs;
-    }
-
-    private Map<String, Object> buildHttpRoute(Rule rule, RouteDestination destination, VirtualService virtualService) {
-        Map<String, Object> httpRoute = new LinkedHashMap<>();
-
-        RouteMatch match = rule.getMatch();
-        if (match != null) {
-            Map<String, Object> matchEntry = new LinkedHashMap<>();
-            Map<String, Object> uri = new LinkedHashMap<>();
-            if (match.getPrefix() != null) {
-                uri.put("prefix", match.getPrefix());
-            }
-            if (match.getRegExp() != null) {
-                uri.put("regex", match.getRegExp());
-            }
-            if (match.getPath() != null) {
-                uri.put("exact", match.getPath());
-            }
-            if (!uri.isEmpty()) {
-                matchEntry.put("uri", uri);
-            }
-
-            Map<String, Object> headers = new LinkedHashMap<>();
-            for (HeaderMatcher headerMatcher : Optional.ofNullable(match.getHeaderMatchers()).orElse(List.of())) {
-                Map<String, Object> matcher = new LinkedHashMap<>();
-                if (Boolean.TRUE.equals(headerMatcher.getRegex())) {
-                    matcher.put("regex", headerMatcher.getValue());
-                } else {
-                    matcher.put("exact", headerMatcher.getValue());
+            if (old.getSpec() != null && old.getSpec().getVirtualServices() != null) {
+                for (VirtualService vs : old.getSpec().getVirtualServices()) {
+                    HttpRoute hr = toHttpRoute(old, vs);
+                    httpRoutes.add(hr);
                 }
-                if (Boolean.TRUE.equals(headerMatcher.getInvertMatch())) {
-                    matcher.put("invertMatch", true);
+            }
+
+            try (Writer writer = Files.newBufferedWriter(outputFile)) {
+                for (HttpRoute hr : httpRoutes) {
+                    writer.write("---\n");
+                    writer.write(YAML.writeValueAsString(hr));
                 }
-                headers.put(headerMatcher.getName(), matcher);
-            }
-            if (!headers.isEmpty()) {
-                matchEntry.put("headers", headers);
-            }
-            if (!matchEntry.isEmpty()) {
-                httpRoute.put("match", List.of(matchEntry));
             }
         }
-
-        Map<String, Object> route = new LinkedHashMap<>();
-        Map<String, Object> destinationBlock = new LinkedHashMap<>();
-        destinationBlock.put("host", destination.getCluster());
-        Endpoint endpoint = parseEndpoint(destination.getEndpoint());
-        Integer port = endpoint.port();
-        if (port != null) {
-            destinationBlock.put("port", Map.of("number", port));
+        catch (Exception e) {
+            throw new RuntimeException(e);
         }
-        route.put("destination", destinationBlock);
-        httpRoute.put("route", List.of(route));
-
-        Map<String, Object> rewrite = new LinkedHashMap<>();
-        if (rule.getPrefixRewrite() != null) {
-            rewrite.put("uri", rule.getPrefixRewrite());
-        }
-        if (rule.getHostRewrite() != null) {
-            rewrite.put("authority", rule.getHostRewrite());
-        }
-        if (!rewrite.isEmpty()) {
-            httpRoute.put("rewrite", rewrite);
-        }
-
-        Map<String, Object> headers = buildHeaders(virtualService.getAddHeaders(), virtualService.getRemoveHeaders(), rule.getAddHeaders(), rule.getRemoveHeaders());
-        if (!headers.isEmpty()) {
-            httpRoute.put("headers", headers);
-        }
-
-        if (rule.getTimeout() != null) {
-            httpRoute.put("timeout", rule.getTimeout() + "ms");
-        }
-        if (rule.getIdleTimeout() != null) {
-            httpRoute.put("idleTimeout", rule.getIdleTimeout() + "ms");
-        }
-
-        return httpRoute;
     }
 
-    private Map<String, Object> buildHeaders(List<HeaderDefinition> vsAdd,
-                                             List<String> vsRemove,
-                                             List<HeaderDefinition> ruleAdd,
-                                             List<String> ruleRemove) {
-        Map<String, Object> headers = new LinkedHashMap<>();
-        Map<String, Object> request = new LinkedHashMap<>();
-        Map<String, Object> add = new LinkedHashMap<>();
+    private static HttpRoute toHttpRoute(RouteConfigurationYaml old, VirtualService vs) {
+        HttpRoute hr = new HttpRoute();
 
-        for (HeaderDefinition header : Optional.ofNullable(vsAdd).orElse(List.of())) {
-            add.put(header.getName(), header.getValue());
+        HttpRoute.ObjectMeta md = new HttpRoute.ObjectMeta();
+        md.setName(safeName(old.getMetadata(), vs));
+        if (old.getMetadata() != null) {
+            md.setNamespace(old.getMetadata().getNamespace());
         }
-        for (HeaderDefinition header : Optional.ofNullable(ruleAdd).orElse(List.of())) {
-            add.put(header.getName(), header.getValue());
-        }
-        if (!add.isEmpty()) {
-            request.put("add", add);
-        }
+        hr.setMetadata(md);
 
-        List<String> removeHeaders = new ArrayList<>();
-        removeHeaders.addAll(Optional.ofNullable(vsRemove).orElse(List.of()));
-        removeHeaders.addAll(Optional.ofNullable(ruleRemove).orElse(List.of()));
-        if (!removeHeaders.isEmpty()) {
-            request.put("remove", removeHeaders);
-        }
+        HttpRoute.HttpRouteSpec spec = new HttpRoute.HttpRouteSpec();
 
-        if (!request.isEmpty()) {
-            headers.put("request", request);
-        }
-        return headers;
-    }
-
-    private Map<String, Object> buildDestinationRule(VirtualService virtualService,
-                                                     RoutingConfigRequestV3 routingConfig,
-                                                     RouteV3 route,
-                                                     String suffix) {
-        RouteDestination destination = route.getDestination();
-
-        Map<String, Object> dr = new LinkedHashMap<>();
-        dr.put("apiVersion", "networking.istio.io/v1beta1");
-        dr.put("kind", "DestinationRule");
-
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("name", virtualService.getName() + "-dr" + suffix);
-        metadata.put("namespace", routingConfig.getNamespace());
-        dr.put("metadata", metadata);
-
-        Map<String, Object> spec = new LinkedHashMap<>();
-        spec.put("host", destination.getCluster());
-
-        Map<String, Object> trafficPolicy = new LinkedHashMap<>();
-        Map<String, Object> tls = new LinkedHashMap<>();
-        if (Boolean.TRUE.equals(destination.getTlsSupported())) {
-            tls.put("mode", "SIMPLE");
-            if (destination.getTlsConfigName() != null) {
-                tls.put("credentialName", destination.getTlsConfigName());
+        // parentRefs из spec.gateways
+        List<HttpRoute.ParentReference> parentRefs = new ArrayList<>();
+        if (old.getSpec() != null && old.getSpec().getGateways() != null) {
+            for (String gw : old.getSpec().getGateways()) {
+                HttpRoute.ParentReference pr = new HttpRoute.ParentReference();
+                pr.setGroup("gateway.networking.k8s.io");
+                pr.setKind("Gateway");
+                pr.setName(gw);
+                // namespace можно добавить при необходимости
+                parentRefs.add(pr);
             }
         }
-        if (!tls.isEmpty()) {
-            trafficPolicy.put("tls", tls);
+        spec.setParentRefs(parentRefs);
+
+        // hostnames из VirtualService.hosts
+        if (vs.getHosts() != null && !vs.getHosts().isEmpty()) {
+            spec.setHostnames(new ArrayList<>(vs.getHosts()));
         }
 
-        Map<String, Object> connectionPool = new LinkedHashMap<>();
-        Map<String, Object> tcp = new LinkedHashMap<>();
-        Map<String, Object> tcpKeepAlive = buildTcpKeepAlive(destination.getTcpKeepalive());
-        if (!tcpKeepAlive.isEmpty()) {
-            tcp.put("tcpKeepalive", tcpKeepAlive);
-        }
-        CircuitBreaker circuitBreaker = destination.getCircuitBreaker();
-        if (circuitBreaker != null && circuitBreaker.getThreshold() != null && circuitBreaker.getThreshold().getMaxConnections() > 0) {
-            tcp.put("maxConnections", circuitBreaker.getThreshold().getMaxConnections());
-        }
-        if (!tcp.isEmpty()) {
-            connectionPool.put("tcp", tcp);
-        }
+        // rules — flatten RouteConfig.Routes[*].Rules[*]
+        List<HttpRoute.Rule> rules = new ArrayList<>();
+        if (vs.getRouteConfiguration() != null && vs.getRouteConfiguration().getRoutes() != null) {
+            for (RouteV3 r : vs.getRouteConfiguration().getRoutes()) {
+                for (Rule rule : r.getRules()) {
+                    // allowed/deny обработка
+                    if (rule.getDeny() != null && Boolean.TRUE.equals(rule.getDeny())) {
+                        // TODO: при необходимости — маппинг в directResponse/EnvoyFilter
+                        continue;
+                    }
+                    if (rule.getAllowed() != null && !Boolean.TRUE.equals(rule.getAllowed())) {
+                        // правило не разрешено — пропускаем
+                        continue;
+                    }
 
-        Map<String, Object> http = new LinkedHashMap<>();
-        Rule firstRule = Optional.ofNullable(route.getRules()).orElse(List.of()).stream().findFirst().orElse(null);
-        if (firstRule != null && firstRule.getIdleTimeout() != null) {
-            http.put("idleTimeout", firstRule.getIdleTimeout() + "ms");
-        }
-        if (!http.isEmpty()) {
-            connectionPool.put("http", http);
-        }
-        if (!connectionPool.isEmpty()) {
-            trafficPolicy.put("connectionPool", connectionPool);
-        }
+                    HttpRoute.Rule newRule = new HttpRoute.Rule();
 
-        StatefulSession session = firstRule != null ? firstRule.getStatefulSession() : null;
-        Map<String, Object> statefulSessionPolicy = buildStatefulSession(session);
-        trafficPolicy.putAll(statefulSessionPolicy);
+                    // match
+                    List<HttpRoute.Match> matches = new ArrayList<>();
+                    HttpRoute.Match m = toMatch(rule.getMatch());
+                    if (m != null) {
+                        matches.add(m);
+                    }
+                    if (!matches.isEmpty()) {
+                        newRule.setMatches(matches);
+                    }
 
-        if (!trafficPolicy.isEmpty()) {
-            spec.put("trafficPolicy", trafficPolicy);
-        }
+                    // filters: URLRewrite + headers
+                    List<HttpRoute.Filter> filters = new ArrayList<>();
 
-        dr.put("spec", spec);
-        return dr;
-    }
+                    if (rule.getPrefixRewrite() != null && !rule.getPrefixRewrite().isEmpty()) {
+                        HttpRoute.Filter f = new HttpRoute.Filter();
+                        f.setType(HttpRoute.FilterType.URLRewrite);
+                        HttpRoute.URLRewrite ur = new HttpRoute.URLRewrite();
+                        HttpRoute.PathRewrite path = new HttpRoute.PathRewrite();
+                        path.setType(HttpRoute.PathRewriteType.ReplacePrefixMatch);
+                        path.setReplacePrefixMatch(rule.getPrefixRewrite());
+                        ur.setPath(path);
+                        if (rule.getHostRewrite() != null && !rule.getHostRewrite().isEmpty()) {
+                            ur.setHostname(rule.getHostRewrite());
+                        }
+                        f.setUrlRewrite(ur);
+                        filters.add(f);
+                    } else if (rule.getHostRewrite() != null && !rule.getHostRewrite().isEmpty()) {
+                        HttpRoute.Filter f = new HttpRoute.Filter();
+                        f.setType(HttpRoute.FilterType.URLRewrite);
+                        HttpRoute.URLRewrite ur = new HttpRoute.URLRewrite();
+                        ur.setHostname(rule.getHostRewrite());
+                        f.setUrlRewrite(ur);
+                        filters.add(f);
+                    }
 
-    private Map<String, Object> buildTcpKeepAlive(TcpKeepalive tcpKeepalive) {
-        Map<String, Object> tcpKeepAlive = new LinkedHashMap<>();
-        if (tcpKeepalive == null) {
-            return tcpKeepAlive;
-        }
-        if (tcpKeepalive.getProbes() != null) {
-            tcpKeepAlive.put("probes", tcpKeepalive.getProbes());
-        }
-        if (tcpKeepalive.getTime() != null) {
-            tcpKeepAlive.put("time", tcpKeepalive.getTime());
-        }
-        if (tcpKeepalive.getInterval() != null) {
-            tcpKeepAlive.put("interval", tcpKeepalive.getInterval());
-        }
-        return tcpKeepAlive;
-    }
+                    if ((rule.getAddHeaders() != null && !rule.getAddHeaders().isEmpty())
+                        || (rule.getRemoveHeaders() != null && !rule.getRemoveHeaders().isEmpty())) {
+                        HttpRoute.Filter f = new HttpRoute.Filter();
+                        f.setType(HttpRoute.FilterType.RequestHeaderModifier);
+                        HttpRoute.RequestHeaderModifier rhm = new HttpRoute.RequestHeaderModifier();
 
-    private Map<String, Object> buildStatefulSession(StatefulSession session) {
-        Map<String, Object> policy = new LinkedHashMap<>();
-        if (session == null || Boolean.FALSE.equals(session.getEnabled())) {
-            return policy;
-        }
-        Map<String, Object> consistentHash = new LinkedHashMap<>();
-        Cookie cookie = session.getCookie();
-        if (cookie != null) {
-            Map<String, Object> cookieMap = new LinkedHashMap<>();
-            cookieMap.put("name", cookie.getName());
-            if (cookie.getPath() != null) {
-                cookieMap.put("path", cookie.getPath());
-            }
-            if (cookie.getTtl() != null) {
-                cookieMap.put("ttl", cookie.getTtl());
-            }
-            consistentHash.put("httpCookie", cookieMap);
-        } else {
-            consistentHash.put("useSourceIp", true);
-        }
+                        if (rule.getAddHeaders() != null) {
+                            List<HttpRoute.Header> add = new ArrayList<>();
+                            for (HeaderDefinition hd : rule.getAddHeaders()) {
+                                HttpRoute.Header h = new HttpRoute.Header();
+                                h.setName(hd.getName());
+                                h.setValue(hd.getValue());
+                                add.add(h);
+                            }
+                            rhm.setAdd(add);
+                        }
+                        if (rule.getRemoveHeaders() != null) {
+                            rhm.setRemove(new ArrayList<>(rule.getRemoveHeaders()));
+                        }
+                        f.setRequestHeaderModifier(rhm);
+                        filters.add(f);
+                    }
 
-        Map<String, Object> loadBalancer = new LinkedHashMap<>();
-        loadBalancer.put("consistentHash", consistentHash);
+                    // TODO: vs.RateLimit, rule.RateLimit → extensionRef / EnvoyFilter
+                    // TODO: Timeout / IdleTimeout → implementation-specific policy
+                    // TODO: LuaFilter → EnvoyFilter
+                    // TODO: StatefulSession → DestinationRule (sticky sessions)
 
-        if (session.getPort() != null) {
-            Map<String, Object> portSetting = new LinkedHashMap<>();
-            portSetting.put("port", Map.of("number", session.getPort()));
-            portSetting.put("loadBalancer", loadBalancer);
-            policy.put("portLevelSettings", List.of(portSetting));
-        } else {
-            policy.put("loadBalancer", loadBalancer);
-        }
+                    if (!filters.isEmpty()) {
+                        newRule.setFilters(filters);
+                    }
 
-        return policy;
-    }
+                    // backendRefs из RouteDestination
+                    List<HttpRoute.BackendRef> backendRefs = new ArrayList<>();
+                    HttpRoute.BackendRef br = toBackendRef(r.getDestination());
+                    if (br != null) {
+                        backendRefs.add(br);
+                    }
+                    if (!backendRefs.isEmpty()) {
+                        newRule.setBackendRefs(backendRefs);
+                    }
 
-    private Optional<Map<String, Object>> buildServiceEntry(VirtualService virtualService,
-                                                            RoutingConfigRequestV3 routingConfig,
-                                                            RouteV3 route,
-                                                            String suffix) {
-        RouteDestination destination = route.getDestination();
-        Endpoint endpoint = parseEndpoint(Optional.ofNullable(destination.getTlsEndpoint()).orElse(destination.getEndpoint()));
-        if (endpoint.host() == null) {
-            return Optional.empty();
-        }
-
-        Map<String, Object> se = new LinkedHashMap<>();
-        se.put("apiVersion", "networking.istio.io/v1beta1");
-        se.put("kind", "ServiceEntry");
-
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("name", virtualService.getName() + "-se" + suffix);
-        metadata.put("namespace", routingConfig.getNamespace());
-        se.put("metadata", metadata);
-
-        Map<String, Object> spec = new LinkedHashMap<>();
-        spec.put("hosts", List.of(endpoint.host()));
-        spec.put("location", "MESH_EXTERNAL");
-
-        Map<String, Object> port = new LinkedHashMap<>();
-        port.put("number", endpoint.port() != null ? endpoint.port() : routingConfig.getListenerPort());
-        port.put("name", Boolean.TRUE.equals(destination.getTlsSupported()) ? "https" : "http");
-        port.put("protocol", Boolean.TRUE.equals(destination.getTlsSupported()) ? "TLS" : "HTTP");
-        spec.put("ports", List.of(port));
-
-        Map<String, Object> endpointMap = new LinkedHashMap<>();
-        endpointMap.put("address", endpoint.host());
-        if (endpoint.port() != null) {
-            endpointMap.put("ports", Map.of("https", endpoint.port()));
-        }
-        spec.put("endpoints", List.of(endpointMap));
-
-        se.put("spec", spec);
-        return Optional.of(se);
-    }
-
-    private Endpoint parseEndpoint(String endpoint) {
-        if (endpoint == null || endpoint.isBlank()) {
-            return new Endpoint(null, null);
-        }
-        String withoutScheme = endpoint;
-        int schemeIndex = endpoint.indexOf("://");
-        if (schemeIndex >= 0) {
-            withoutScheme = endpoint.substring(schemeIndex + 3);
-        }
-
-        int pathIndex = withoutScheme.indexOf('/') >= 0 ? withoutScheme.indexOf('/') : withoutScheme.length();
-        String hostPort = withoutScheme.substring(0, pathIndex);
-
-        Integer port = null;
-        int lastColon = hostPort.lastIndexOf(':');
-        if (lastColon > 0 && lastColon < hostPort.length() - 1) {
-            String portCandidate = hostPort.substring(lastColon + 1);
-            if (portCandidate.chars().allMatch(Character::isDigit)) {
-                try {
-                    port = Integer.parseInt(portCandidate);
-                    hostPort = hostPort.substring(0, lastColon);
-                } catch (NumberFormatException ignored) {
-                    // keep original host and null port when parsing fails
+                    rules.add(newRule);
                 }
             }
         }
 
-        return new Endpoint(hostPort.isBlank() ? null : hostPort, port);
+        spec.setRules(rules);
+        hr.setSpec(spec);
+        return hr;
     }
 
-    private void writeManifests(List<Map<String, Object>> manifests) {
-        if (manifests.isEmpty()) {
-            return;
+    private static String safeName(Metadata meta, VirtualService vs) {
+//        if (vs != null && vs.getName() != null && !vs.getName().isEmpty()) {
+//            return vs.getName();
+//        }
+        if (meta != null && meta.getName() != null && !meta.getName().isEmpty()) {
+            return meta.getName() + "-http-route";
         }
-        Path output = Path.of("generated-istio.yaml_new");
-        try (Writer writer = Files.newBufferedWriter(output, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
-            outputYaml().dumpAll(manifests.iterator(), writer);
-        } catch (IOException e) {
-            log.error("Failed to write Istio manifests to {}", output.toAbsolutePath(), e);
-        }
+        return "generated-http-route";
     }
 
-    private record Endpoint(String host, Integer port) {
+    private static HttpRoute.Match toMatch(RouteMatch match) {
+        if (match == null) {
+            return null;
+        }
+        HttpRoute.Match res = new HttpRoute.Match();
+
+        // path
+        if (match.getPrefix() != null && !match.getPrefix().isEmpty()) {
+            HttpRoute.PathMatch pm = new HttpRoute.PathMatch();
+            pm.setType(HttpRoute.PathMatchType.Prefix);
+            pm.setValue(match.getPrefix());
+            res.setPath(pm);
+        } else if (match.getPath() != null && !match.getPath().isEmpty()) {
+            HttpRoute.PathMatch pm = new HttpRoute.PathMatch();
+            pm.setType(HttpRoute.PathMatchType.Exact);
+            pm.setValue(match.getPath());
+            res.setPath(pm);
+        } else if (match.getRegExp() != null && !match.getRegExp().isEmpty()) {
+            // В core HTTPRoute regex нет — оставляем TODO, чтобы не терять факт наличия regex
+            // TODO: маппить Regexp в Istio VirtualService или implementation-specific расширения
+        }
+
+        // headers
+        if (match.getHeaderMatchers() != null && !match.getHeaderMatchers().isEmpty()) {
+            List<HttpRoute.HeaderMatch> headers = new ArrayList<>();
+            for (HeaderMatcher hm : match.getHeaderMatchers()) {
+                HttpRoute.HeaderMatch hh = new HttpRoute.HeaderMatch();
+                hh.setName(hm.getName());
+                //todo vlla доделать в соответствии с нашими DTO
+//                hh.setType(hm.getType());    // предполагаем, что type уже совместим (Exact/RegularExpression и т.п.)
+//                hh.setValue(hm.getValue());
+                headers.add(hh);
+            }
+            res.setHeaders(headers);
+        }
+
+        if (res.getPath() == null && (res.getHeaders() == null || res.getHeaders().isEmpty())) {
+            return null;
+        }
+        return res;
+    }
+
+    private static HttpRoute.BackendRef toBackendRef(RouteDestination dst) {
+        if (dst == null) {
+            return null;
+        }
+        EndpointDTO endpoint = null;
+        if (dst.getEndpoint() != null && !dst.getEndpoint().isEmpty()) {
+            endpoint = EndpointParser.parse(dst.getEndpoint());
+        }
+
+        HttpRoute.BackendRef br = new HttpRoute.BackendRef();
+        br.setKind("Service");
+        br.setName(endpoint.getHost());
+        br.setPort(endpoint.getPort());
+        // TODO: dst.TlsSupported / TlsEndpoint / HttpVersion / TlsConfigName → DestinationRule/Policy
+
+        return br;
     }
 }
+
