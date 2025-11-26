@@ -69,6 +69,12 @@
             <artifactId>kubernetes-model-gatewayapi</artifactId>
             <version>6.13.5</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.0.76</version>
+        </dependency>
     </dependencies>
 
     <build>

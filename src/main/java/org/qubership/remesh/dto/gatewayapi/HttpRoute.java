@@ -87,7 +87,7 @@ public class HttpRoute {
 
     public enum PathMatchType {
         Exact,
-        Prefix,
+        PathPrefix,
         RegularExpression
     }
 

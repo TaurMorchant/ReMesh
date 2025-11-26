@@ -4,16 +4,19 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.qubership.remesh.dto.*;
 import org.qubership.remesh.dto.gatewayapi.HttpRoute;
 import org.qubership.remesh.util.EndpointDTO;
 import org.qubership.remesh.util.EndpointParser;
+import org.qubership.remesh.validation.HttpRouteValidator;
 
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
+@Slf4j
 public class RouteConfigurationHandler implements CrHandler {
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory())
@@ -40,6 +43,10 @@ public class RouteConfigurationHandler implements CrHandler {
 
             try (Writer writer = Files.newBufferedWriter(outputFile)) {
                 for (HttpRoute hr : httpRoutes) {
+                    JsonNode httpRouteNode = YAML.valueToTree(hr);
+                    log.info("Validation:");
+                    HttpRouteValidator.validate(httpRouteNode);
+
                     writer.write("---\n");
                     writer.write(YAML.writeValueAsString(hr));
                 }
@@ -76,9 +83,14 @@ public class RouteConfigurationHandler implements CrHandler {
         }
         spec.setParentRefs(parentRefs);
 
-        // hostnames из VirtualService.hosts
-        if (vs.getHosts() != null && !vs.getHosts().isEmpty()) {
-            spec.setHostnames(new ArrayList<>(vs.getHosts()));
+        List<String> hosts = vs.getHosts();
+        if (hosts != null && !hosts.isEmpty()) {
+            if (hosts.size() == 1 && hosts.getFirst().equals("*")) {
+                //do not specify at all
+            }
+            else {
+                spec.setHostnames(hosts);
+            }
         }
 
         // rules — flatten RouteConfig.Routes[*].Rules[*]
@@ -201,7 +213,7 @@ public class RouteConfigurationHandler implements CrHandler {
         // path
         if (match.getPrefix() != null && !match.getPrefix().isEmpty()) {
             HttpRoute.PathMatch pm = new HttpRoute.PathMatch();
-            pm.setType(HttpRoute.PathMatchType.Prefix);
+            pm.setType(HttpRoute.PathMatchType.PathPrefix);
             pm.setValue(match.getPrefix());
             res.setPath(pm);
         } else if (match.getPath() != null && !match.getPath().isEmpty()) {
