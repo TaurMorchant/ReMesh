@@ -11,8 +11,8 @@ public class VirtualService {
     private String name; //not used
     private List<String> hosts;
     private String rateLimit; //not used
-    private List<HeaderDefinition> addHeaders; //not used, could be implemented
-    private List<String> removeHeaders; //not used, could be implemented
+    private List<HeaderDefinition> addHeaders;
+    private List<String> removeHeaders;
     private RouteConfig routeConfiguration;
     private Boolean overridden; //not used
 }

@@ -127,7 +127,7 @@ spec:
                       character. No other punctuation is allowed.
                     maxLength: 253
                     minLength: 1
-                    pattern: ^(\*\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    # pattern: ^(\*\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$ # removed to allow placeholders
                     type: string
                   maxItems: 16
                   type: array
@@ -731,7 +731,7 @@ spec:
                                           Support: Core
                                         maxLength: 253
                                         minLength: 1
-                                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                        # pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$  # removed to allow placeholders
                                         type: string
                                       path:
                                         description: |-
@@ -1056,7 +1056,7 @@ spec:
                                           Support: Extended
                                         maxLength: 253
                                         minLength: 1
-                                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                        # pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$ # removed to allow placeholders
                                         type: string
                                       path:
                                         description: |-
@@ -1619,7 +1619,7 @@ spec:
                                     Support: Core
                                   maxLength: 253
                                   minLength: 1
-                                  pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                  # pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$ # removed to allow placeholders
                                   type: string
                                 path:
                                   description: |-
@@ -1942,7 +1942,7 @@ spec:
                                     Support: Extended
                                   maxLength: 253
                                   minLength: 1
-                                  pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                  # pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$ # removed to allow placeholders
                                   type: string
                                 path:
                                   description: |-
@@ -2860,7 +2860,7 @@ spec:
                       character. No other punctuation is allowed.
                     maxLength: 253
                     minLength: 1
-                    pattern: ^(\*\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    # pattern: ^(\*\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$ # removed to allow placeholders
                     type: string
                   maxItems: 16
                   type: array
@@ -3434,7 +3434,7 @@ spec:
                                           Support: Core
                                         maxLength: 253
                                         minLength: 1
-                                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                        # pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$ # removed to allow placeholders
                                         type: string
                                       path:
                                         description: |-
@@ -3759,7 +3759,7 @@ spec:
                                           Support: Extended
                                         maxLength: 253
                                         minLength: 1
-                                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                        # pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$ # removed to allow placeholders
                                         type: string
                                       path:
                                         description: |-
@@ -4322,7 +4322,7 @@ spec:
                                     Support: Core
                                   maxLength: 253
                                   minLength: 1
-                                  pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                  # pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$ # removed to allow placeholders
                                   type: string
                                 path:
                                   description: |-
@@ -4645,7 +4645,7 @@ spec:
                                     Support: Extended
                                   maxLength: 253
                                   minLength: 1
-                                  pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                  # pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$ # removed to allow placeholders
                                   type: string
                                 path:
                                   description: |-
