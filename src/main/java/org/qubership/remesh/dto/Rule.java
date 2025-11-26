@@ -13,11 +13,11 @@ public class Rule {
     private String hostRewrite;
     private List<HeaderDefinition> addHeaders;
     private List<String> removeHeaders;
-    private Boolean allowed;
-    private Long timeout;
-    private Long idleTimeout;
-    private StatefulSession statefulSession;
-    private String rateLimit;
-    private Boolean deny;
-    private String luaFilter;
+    private Boolean allowed; //not used
+    private Long timeout; //not used
+    private Long idleTimeout; //not used
+    private StatefulSession statefulSession; //not used
+    private String rateLimit; //not used
+    private Boolean deny; //not used
+    private String luaFilter; //not used
 }

@@ -15,6 +15,7 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Slf4j
 public class RouteConfigurationHandler implements CrHandler {
@@ -30,21 +31,21 @@ public class RouteConfigurationHandler implements CrHandler {
     @Override
     public void handle(JsonNode node, Path outputFile) {
         try {
-            RouteConfigurationYaml old = YAML.treeToValue(node, RouteConfigurationYaml.class);
+            RouteConfigurationYaml original = YAML.treeToValue(node, RouteConfigurationYaml.class);
 
             List<HttpRoute> httpRoutes = new ArrayList<>();
 
-            if (old.getSpec() != null && old.getSpec().getVirtualServices() != null) {
-                for (VirtualService vs : old.getSpec().getVirtualServices()) {
-                    HttpRoute hr = toHttpRoute(old, vs);
-                    httpRoutes.add(hr);
+            if (original.getSpec() != null && original.getSpec().getVirtualServices() != null) {
+                for (VirtualService vs : original.getSpec().getVirtualServices()) {
+                    HttpRoute httpRoute = toHttpRoute(original, vs);
+                    httpRoutes.add(httpRoute);
                 }
             }
 
             try (Writer writer = Files.newBufferedWriter(outputFile)) {
                 for (HttpRoute hr : httpRoutes) {
                     JsonNode httpRouteNode = YAML.valueToTree(hr);
-                    log.info("Validation:");
+                    log.info("Validate HttpRoute {}", hr.getMetadata().getName());
                     HttpRouteValidator.validate(httpRouteNode);
 
                     writer.write("---\n");
@@ -57,33 +58,22 @@ public class RouteConfigurationHandler implements CrHandler {
         }
     }
 
-    private static HttpRoute toHttpRoute(RouteConfigurationYaml old, VirtualService vs) {
-        HttpRoute hr = new HttpRoute();
+    private HttpRoute toHttpRoute(RouteConfigurationYaml routeConfiguration, VirtualService virtualService) {
+        HttpRoute httpRoute = new HttpRoute();
 
-        HttpRoute.ObjectMeta md = new HttpRoute.ObjectMeta();
-        md.setName(safeName(old.getMetadata()));
-        if (old.getMetadata() != null) {
-            md.setNamespace(old.getMetadata().getNamespace());
+        HttpRoute.Metadata metadata = new HttpRoute.Metadata();
+        metadata.setName(safeName(routeConfiguration.getMetadata()));
+        if (routeConfiguration.getMetadata() != null) {
+            metadata.setNamespace(routeConfiguration.getMetadata().getNamespace());
         }
-        hr.setMetadata(md);
+        httpRoute.setMetadata(metadata);
 
         HttpRoute.HttpRouteSpec spec = new HttpRoute.HttpRouteSpec();
 
-        // parentRefs из spec.gateways
-        List<HttpRoute.ParentReference> parentRefs = new ArrayList<>();
-        if (old.getSpec() != null && old.getSpec().getGateways() != null) {
-            for (String gw : old.getSpec().getGateways()) {
-                HttpRoute.ParentReference pr = new HttpRoute.ParentReference();
-                pr.setGroup("gateway.networking.k8s.io");
-                pr.setKind("Gateway");
-                pr.setName(gw);
-                // namespace можно добавить при необходимости
-                parentRefs.add(pr);
-            }
-        }
+        List<HttpRoute.ParentReference> parentRefs = gatewaysToParentReferences(routeConfiguration);
         spec.setParentRefs(parentRefs);
 
-        List<String> hosts = vs.getHosts();
+        List<String> hosts = virtualService.getHosts();
         if (hosts != null && !hosts.isEmpty()) {
             if (hosts.size() == 1 && hosts.getFirst().equals("*")) {
                 //do not specify at all
@@ -95,16 +85,14 @@ public class RouteConfigurationHandler implements CrHandler {
 
         // rules — flatten RouteConfig.Routes[*].Rules[*]
         List<HttpRoute.Rule> rules = new ArrayList<>();
-        if (vs.getRouteConfiguration() != null && vs.getRouteConfiguration().getRoutes() != null) {
-            for (RouteV3 r : vs.getRouteConfiguration().getRoutes()) {
+        RouteConfig routeConfig = virtualService.getRouteConfiguration();
+        if (routeConfig != null && routeConfig.getRoutes() != null) {
+            for (RouteV3 r : routeConfig.getRoutes()) {
                 for (Rule rule : r.getRules()) {
-                    // allowed/deny обработка
                     if (rule.getDeny() != null && Boolean.TRUE.equals(rule.getDeny())) {
-                        // TODO: при необходимости — маппинг в directResponse/EnvoyFilter
                         continue;
                     }
-                    if (rule.getAllowed() != null && !Boolean.TRUE.equals(rule.getAllowed())) {
-                        // правило не разрешено — пропускаем
+                    if (rule.getAllowed() != null && Boolean.FALSE.equals(rule.getAllowed())) {
                         continue;
                     }
 
@@ -112,66 +100,16 @@ public class RouteConfigurationHandler implements CrHandler {
 
                     // match
                     List<HttpRoute.Match> matches = new ArrayList<>();
-                    HttpRoute.Match m = toMatch(rule.getMatch());
-                    if (m != null) {
-                        matches.add(m);
+                    HttpRoute.Match match = toMatch(rule.getMatch());
+                    if (match != null) {
+                        matches.add(match);
                     }
                     if (!matches.isEmpty()) {
                         newRule.setMatches(matches);
                     }
 
                     // filters: URLRewrite + headers
-                    List<HttpRoute.Filter> filters = new ArrayList<>();
-
-                    if (rule.getPrefixRewrite() != null && !rule.getPrefixRewrite().isEmpty()) {
-                        HttpRoute.Filter f = new HttpRoute.Filter();
-                        f.setType(HttpRoute.FilterType.URLRewrite);
-                        HttpRoute.URLRewrite ur = new HttpRoute.URLRewrite();
-                        HttpRoute.PathRewrite path = new HttpRoute.PathRewrite();
-                        path.setType(HttpRoute.PathRewriteType.ReplacePrefixMatch);
-                        path.setReplacePrefixMatch(rule.getPrefixRewrite());
-                        ur.setPath(path);
-                        if (rule.getHostRewrite() != null && !rule.getHostRewrite().isEmpty()) {
-                            ur.setHostname(rule.getHostRewrite());
-                        }
-                        f.setUrlRewrite(ur);
-                        filters.add(f);
-                    } else if (rule.getHostRewrite() != null && !rule.getHostRewrite().isEmpty()) {
-                        HttpRoute.Filter f = new HttpRoute.Filter();
-                        f.setType(HttpRoute.FilterType.URLRewrite);
-                        HttpRoute.URLRewrite ur = new HttpRoute.URLRewrite();
-                        ur.setHostname(rule.getHostRewrite());
-                        f.setUrlRewrite(ur);
-                        filters.add(f);
-                    }
-
-                    if ((rule.getAddHeaders() != null && !rule.getAddHeaders().isEmpty())
-                        || (rule.getRemoveHeaders() != null && !rule.getRemoveHeaders().isEmpty())) {
-                        HttpRoute.Filter f = new HttpRoute.Filter();
-                        f.setType(HttpRoute.FilterType.RequestHeaderModifier);
-                        HttpRoute.RequestHeaderModifier rhm = new HttpRoute.RequestHeaderModifier();
-
-                        if (rule.getAddHeaders() != null) {
-                            List<HttpRoute.Header> add = new ArrayList<>();
-                            for (HeaderDefinition hd : rule.getAddHeaders()) {
-                                HttpRoute.Header h = new HttpRoute.Header();
-                                h.setName(hd.getName());
-                                h.setValue(hd.getValue());
-                                add.add(h);
-                            }
-                            rhm.setAdd(add);
-                        }
-                        if (rule.getRemoveHeaders() != null) {
-                            rhm.setRemove(new ArrayList<>(rule.getRemoveHeaders()));
-                        }
-                        f.setRequestHeaderModifier(rhm);
-                        filters.add(f);
-                    }
-
-                    // TODO: vs.RateLimit, rule.RateLimit → extensionRef / EnvoyFilter
-                    // TODO: Timeout / IdleTimeout → implementation-specific policy
-                    // TODO: LuaFilter → EnvoyFilter
-                    // TODO: StatefulSession → DestinationRule (sticky sessions)
+                    List<HttpRoute.Filter> filters = getFilters(rule);
 
                     if (!filters.isEmpty()) {
                         newRule.setFilters(filters);
@@ -179,9 +117,9 @@ public class RouteConfigurationHandler implements CrHandler {
 
                     // backendRefs из RouteDestination
                     List<HttpRoute.BackendRef> backendRefs = new ArrayList<>();
-                    HttpRoute.BackendRef br = toBackendRef(r.getDestination());
-                    if (br != null) {
-                        backendRefs.add(br);
+                    HttpRoute.BackendRef backendRef = toBackendRef(r.getDestination());
+                    if (backendRef != null) {
+                        backendRefs.add(backendRef);
                     }
                     if (!backendRefs.isEmpty()) {
                         newRule.setBackendRefs(backendRefs);
@@ -193,75 +131,169 @@ public class RouteConfigurationHandler implements CrHandler {
         }
 
         spec.setRules(rules);
-        hr.setSpec(spec);
-        return hr;
+        httpRoute.setSpec(spec);
+        return httpRoute;
     }
 
-    private static String safeName(Metadata meta) {
-        if (meta != null && meta.getName() != null && !meta.getName().isEmpty()) {
-            return meta.getName() + "-http-route";
+    private List<HttpRoute.Filter> getFilters(Rule rule) {
+        List<HttpRoute.Filter> filters = new ArrayList<>();
+
+        if (rule.getPrefixRewrite() != null && !rule.getPrefixRewrite().isEmpty()) {
+            HttpRoute.Filter filter = new HttpRoute.Filter();
+            filter.setType(HttpRoute.FilterType.URLRewrite);
+            HttpRoute.URLRewrite urlRewrite = new HttpRoute.URLRewrite();
+            HttpRoute.PathRewrite pathRewrite = new HttpRoute.PathRewrite();
+            pathRewrite.setType(HttpRoute.PathRewriteType.ReplacePrefixMatch);
+            pathRewrite.setReplacePrefixMatch(rule.getPrefixRewrite());
+            urlRewrite.setPath(pathRewrite);
+            if (rule.getHostRewrite() != null && !rule.getHostRewrite().isEmpty()) {
+                urlRewrite.setHostname(rule.getHostRewrite());
+            }
+            filter.setUrlRewrite(urlRewrite);
+            filters.add(filter);
+        } else if (rule.getHostRewrite() != null && !rule.getHostRewrite().isEmpty()) {
+            HttpRoute.Filter filter = new HttpRoute.Filter();
+            filter.setType(HttpRoute.FilterType.URLRewrite);
+            HttpRoute.URLRewrite urlRewrite = new HttpRoute.URLRewrite();
+            urlRewrite.setHostname(rule.getHostRewrite());
+            filter.setUrlRewrite(urlRewrite);
+            filters.add(filter);
+        }
+
+        if ((rule.getAddHeaders() != null && !rule.getAddHeaders().isEmpty())
+            || (rule.getRemoveHeaders() != null && !rule.getRemoveHeaders().isEmpty())) {
+            HttpRoute.Filter filter = new HttpRoute.Filter();
+            filter.setType(HttpRoute.FilterType.RequestHeaderModifier);
+            HttpRoute.RequestHeaderModifier requestHeaderModifier = new HttpRoute.RequestHeaderModifier();
+
+            if (rule.getAddHeaders() != null) {
+                List<HttpRoute.Header> add = new ArrayList<>();
+                for (HeaderDefinition headerDefinition : rule.getAddHeaders()) {
+                    HttpRoute.Header header = new HttpRoute.Header();
+                    header.setName(headerDefinition.getName());
+                    header.setValue(headerDefinition.getValue());
+                    add.add(header);
+                }
+                requestHeaderModifier.setAdd(add);
+            }
+            if (rule.getRemoveHeaders() != null) {
+                requestHeaderModifier.setRemove(new ArrayList<>(rule.getRemoveHeaders()));
+            }
+            filter.setRequestHeaderModifier(requestHeaderModifier);
+            filters.add(filter);
+        }
+        return filters;
+
+        // TODO: vs.RateLimit, rule.RateLimit → extensionRef / EnvoyFilter
+        // TODO: Timeout / IdleTimeout → implementation-specific policy
+        // TODO: LuaFilter → EnvoyFilter
+        // TODO: StatefulSession → DestinationRule (sticky sessions)
+    }
+
+    private List<HttpRoute.ParentReference> gatewaysToParentReferences(RouteConfigurationYaml routeConfiguration) {
+        List<HttpRoute.ParentReference> parentRefs = new ArrayList<>();
+        if (routeConfiguration.getSpec() != null && routeConfiguration.getSpec().getGateways() != null) {
+            for (String gateway : routeConfiguration.getSpec().getGateways()) {
+                HttpRoute.ParentReference parentReference = new HttpRoute.ParentReference();
+                parentReference.setGroup("gateway.networking.k8s.io");
+                parentReference.setKind("Gateway");
+                parentReference.setName(gateway);
+                parentRefs.add(parentReference);
+            }
+        }
+        return parentRefs;
+    }
+
+    private String safeName(Metadata metadata) {
+        if (metadata != null && metadata.getName() != null && !metadata.getName().isEmpty()) {
+            return metadata.getName() + "-http-route";
         }
         return "generated-http-route";
     }
 
-    private static HttpRoute.Match toMatch(RouteMatch match) {
+    private HttpRoute.Match toMatch(RouteMatch match) {
         if (match == null) {
             return null;
         }
-        HttpRoute.Match res = new HttpRoute.Match();
+        HttpRoute.Match result = new HttpRoute.Match();
 
         // path
         if (match.getPrefix() != null && !match.getPrefix().isEmpty()) {
-            HttpRoute.PathMatch pm = new HttpRoute.PathMatch();
-            pm.setType(HttpRoute.PathMatchType.PathPrefix);
-            pm.setValue(match.getPrefix());
-            res.setPath(pm);
+            HttpRoute.PathMatch pathMatch = new HttpRoute.PathMatch();
+            pathMatch.setType(HttpRoute.PathMatchType.PathPrefix);
+            pathMatch.setValue(match.getPrefix());
+            result.setPath(pathMatch);
         } else if (match.getPath() != null && !match.getPath().isEmpty()) {
-            HttpRoute.PathMatch pm = new HttpRoute.PathMatch();
-            pm.setType(HttpRoute.PathMatchType.Exact);
-            pm.setValue(match.getPath());
-            res.setPath(pm);
+            HttpRoute.PathMatch pathMatch = new HttpRoute.PathMatch();
+            pathMatch.setType(HttpRoute.PathMatchType.Exact);
+            pathMatch.setValue(match.getPath());
+            result.setPath(pathMatch);
         } else if (match.getRegExp() != null && !match.getRegExp().isEmpty()) {
-            // В core HTTPRoute regex нет — оставляем TODO, чтобы не терять факт наличия regex
-            // TODO: маппить Regexp в Istio VirtualService или implementation-specific расширения
+            HttpRoute.PathMatch pathMatch = new HttpRoute.PathMatch();
+            pathMatch.setType(HttpRoute.PathMatchType.RegularExpression);
+            pathMatch.setValue(match.getRegExp());
+            result.setPath(pathMatch);
         }
 
         // headers
         if (match.getHeaderMatchers() != null && !match.getHeaderMatchers().isEmpty()) {
-            List<HttpRoute.HeaderMatch> headers = new ArrayList<>();
-            for (HeaderMatcher hm : match.getHeaderMatchers()) {
-                HttpRoute.HeaderMatch hh = new HttpRoute.HeaderMatch();
-                hh.setName(hm.getName());
-                //todo vlla доделать в соответствии с нашими DTO
-//                hh.setType(hm.getType());    // предполагаем, что type уже совместим (Exact/RegularExpression и т.п.)
-//                hh.setValue(hm.getValue());
-                headers.add(hh);
-            }
-            res.setHeaders(headers);
+            List<HttpRoute.HeaderMatch> headers = getHeaderMatches(match);
+            result.setHeaders(headers);
         }
 
-        if (res.getPath() == null && (res.getHeaders() == null || res.getHeaders().isEmpty())) {
+        if (result.getPath() == null && (result.getHeaders() == null || result.getHeaders().isEmpty())) {
             return null;
         }
-        return res;
+        return result;
     }
 
-    private static HttpRoute.BackendRef toBackendRef(RouteDestination dst) {
+    private List<HttpRoute.HeaderMatch> getHeaderMatches(RouteMatch match) {
+        List<HttpRoute.HeaderMatch> headers = new ArrayList<>();
+        for (HeaderMatcher headerMatcher : match.getHeaderMatchers()) {
+            HttpRoute.HeaderMatch headerMatch = new HttpRoute.HeaderMatch();
+            headerMatch.setName(headerMatcher.getName());
+            if (headerMatcher.getExactMatch() != null) {
+                headerMatch.setType(HttpRoute.HeaderMatchType.Exact);
+                headerMatch.setValue(headerMatcher.getExactMatch());
+            }
+            else if (headerMatcher.getSafeRegexMatch() != null) {
+                headerMatch.setType(HttpRoute.HeaderMatchType.RegularExpression);
+                headerMatch.setValue(headerMatcher.getSafeRegexMatch());
+            } else if (headerMatcher.getPrefixMatch() != null) {
+                headerMatch.setType(HttpRoute.HeaderMatchType.RegularExpression);
+                headerMatch.setValue("^" + Pattern.quote(headerMatcher.getSafeRegexMatch()) + ".*$");
+            }
+            else if (headerMatcher.getSuffixMatch() != null) {
+                headerMatch.setType(HttpRoute.HeaderMatchType.RegularExpression);
+                headerMatch.setValue(".*" + Pattern.quote(headerMatcher.getSafeRegexMatch()) + "$");
+            }
+            else if (headerMatcher.isPresentMatch()) {
+                headerMatch.setType(HttpRoute.HeaderMatchType.RegularExpression);
+                headerMatch.setValue(".*");
+            }
+            else
+            {
+                //TODO VLLA остальные типы не поддерживаются в чистом виде
+                log.warn("Header match {} is unsupported", headerMatch);
+            }
+
+            headers.add(headerMatch);
+        }
+        return headers;
+    }
+
+    private HttpRoute.BackendRef toBackendRef(RouteDestination dst) {
         if (dst == null) {
             return null;
         }
-        EndpointDTO endpoint = null;
-        if (dst.getEndpoint() != null && !dst.getEndpoint().isEmpty()) {
-            endpoint = EndpointParser.parse(dst.getEndpoint());
-        }
+        EndpointDTO endpoint = EndpointParser.parse(dst.getEndpoint());
 
-        HttpRoute.BackendRef br = new HttpRoute.BackendRef();
-        br.setKind("Service");
-        br.setName(endpoint.getHost());
-        br.setPort(endpoint.getPort());
+        HttpRoute.BackendRef backendRef = new HttpRoute.BackendRef();
+        backendRef.setKind("Service");
+        backendRef.setName(endpoint.getHost());
+        backendRef.setPort(endpoint.getPort());
         // TODO: dst.TlsSupported / TlsEndpoint / HttpVersion / TlsConfigName → DestinationRule/Policy
 
-        return br;
+        return backendRef;
     }
 }
-

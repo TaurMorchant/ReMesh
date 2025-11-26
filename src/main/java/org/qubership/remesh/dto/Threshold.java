@@ -5,6 +5,6 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class Threshold {
+public class Threshold { //not used
     private Integer maxConnections;
 }

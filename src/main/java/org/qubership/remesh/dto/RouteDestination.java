@@ -6,12 +6,12 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class RouteDestination {
-    private String cluster;
-    private Boolean tlsSupported;
+    private String cluster; //not used
+    private Boolean tlsSupported; //not used
     private String endpoint;
-    private String tlsEndpoint;
-    private Integer httpVersion;
-    private String tlsConfigName;
-    private CircuitBreaker circuitBreaker;
-    private TcpKeepalive tcpKeepalive;
+    private String tlsEndpoint; //not used
+    private Integer httpVersion; //not used
+    private String tlsConfigName; //not used
+    private CircuitBreaker circuitBreaker; //not used
+    private TcpKeepalive tcpKeepalive; //not used
 }

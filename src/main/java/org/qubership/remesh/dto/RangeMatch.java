@@ -5,7 +5,7 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class RangeMatch {
+public class RangeMatch { //not used
     private int start;
     private int end;
 }

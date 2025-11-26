@@ -5,7 +5,7 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class TcpKeepalive {
+public class TcpKeepalive { //not used
     private Integer probes;
     private Integer time;
     private Integer interval;

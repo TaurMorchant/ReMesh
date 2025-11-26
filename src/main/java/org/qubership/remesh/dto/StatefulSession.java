@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class StatefulSession {
+public class StatefulSession { //not used
     private String version;
     private String namespace;
     private String cluster;

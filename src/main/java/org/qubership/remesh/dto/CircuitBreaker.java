@@ -5,6 +5,6 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class CircuitBreaker {
+public class CircuitBreaker { //not used
     private Threshold threshold;
 }

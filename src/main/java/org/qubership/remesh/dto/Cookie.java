@@ -5,7 +5,7 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class Cookie {
+public class Cookie { //not used
     private String name;
     private String path;
     private String domain;

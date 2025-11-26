@@ -8,6 +8,6 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class RouteConfig {
-    private String version;
+    private String version; //not used
     private List<RouteV3> routes;
 }

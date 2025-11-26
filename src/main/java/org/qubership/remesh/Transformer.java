@@ -23,7 +23,7 @@ public class Transformer {
         try (Stream<Path> stream = Files.walk(dir)) {
             stream.filter(Files::isRegularFile)
                     .filter(this::isYaml)
-                    .forEach(this::processFile2);
+                    .forEach(this::processFile);
         }
     }
 
@@ -32,9 +32,9 @@ public class Transformer {
         return name.endsWith(".yaml") || name.endsWith(".yml");
     }
 
-    private void processFile2(Path file) {
-        String outputFile = file.getFileName().toString() + "_new";
-        log.info("output file {}", outputFile);
+    private void processFile(Path file) {
+        log.info("Processing file {}", file);
+        Path outputFile = file.resolveSibling(file.getFileName().toString() + "_new");
         try (InputStream is = Files.newInputStream(file)) {
             MappingIterator<JsonNode> it = YAML.readerFor(JsonNode.class).readValues(is);
 
@@ -50,11 +50,12 @@ public class Transformer {
                     log.warn("Handler not found for kind {}", kindNode.asText());
                 }
                 else {
-                    handler.handle(node, Path.of(outputFile));
+                    handler.handle(node, outputFile);
                 }
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        log.info("Output file is {}", outputFile);
     }
 }

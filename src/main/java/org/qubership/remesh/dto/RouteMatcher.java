@@ -7,9 +7,11 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class RouteMatcher {
+public class RouteMatcher { //not used
     private String prefix;
     private String regExp;
     private String path;
     private List<HeaderMatcher> headerMatchers;
+    private List<HeaderDefinition> addHeaders;
+    private List<String> removeHeaders;
 }

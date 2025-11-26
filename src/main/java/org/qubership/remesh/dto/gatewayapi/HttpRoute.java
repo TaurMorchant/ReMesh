@@ -13,7 +13,7 @@ public class HttpRoute {
 
     private String apiVersion = "gateway.networking.k8s.io/v1";
     private String kind = "HTTPRoute";
-    private ObjectMeta metadata;
+    private Metadata metadata;
     private HttpRouteSpec spec;
     private Status status;
 
@@ -22,7 +22,7 @@ public class HttpRoute {
        ========================= */
     @Data
     @NoArgsConstructor
-    public static class ObjectMeta {
+    public static class Metadata {
         private String name;
         private String namespace;
         private Map<String, String> labels;

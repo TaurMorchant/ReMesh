@@ -9,9 +9,9 @@ public class HeaderMatcher {
     private String name;
     private String exactMatch;
     private String safeRegexMatch;
-    RangeMatch     rangeMatch;
+    RangeMatch     rangeMatch; //not used
     private boolean presentMatch;
     private String prefixMatch;
     private String suffixMatch;
-    private boolean invertMatch;
+    private boolean invertMatch; //not used
 }
