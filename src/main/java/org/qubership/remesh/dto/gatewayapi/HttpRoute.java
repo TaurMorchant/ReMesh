@@ -6,10 +6,10 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 import java.util.Map;
 
-//generatord from https://gateway-api.sigs.k8s.io/reference/1.3/spec/?utm_source=chatgpt.com#httproute
+//generated from https://gateway-api.sigs.k8s.io/reference/1.3/spec/?utm_source=chatgpt.com#httproute
 @Data
 @NoArgsConstructor
-public class HttpRoute {
+public class HttpRoute implements Resource {
 
     private String apiVersion = "gateway.networking.k8s.io/v1";
     private String kind = "HTTPRoute";
