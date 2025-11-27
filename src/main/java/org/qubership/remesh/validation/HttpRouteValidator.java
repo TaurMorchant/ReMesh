@@ -14,7 +14,7 @@ import java.util.Set;
 public final class HttpRouteValidator {
 
     private static final String CRD_RESOURCE =
-            "schemas/gateway.networking.k8s.io_httproutes.yaml";
+            "schemas/gateway.networking.k8s.io_httproute.yaml";
 
     private static final ObjectMapper YAML_MAPPER =
             new ObjectMapper(new YAMLFactory());
