@@ -24,6 +24,8 @@ import java.util.regex.Pattern;
 public class Transformer {
     private static final Pattern API_VERSION_SUFFIX = Pattern.compile("/v\\w+$");
     private static final ObjectMapper MAPPER = ObjectMapperProvider.getMapper();
+    private static final String CORE_NETCRACKER_COM_API_VERSION = "core.netcracker.com/v1";
+    private static final String MESH_KIND = "Mesh";
 
     public void transform(Path dir) throws IOException {
         log.info("Start transforming in dir '{}'", dir);
@@ -109,13 +111,13 @@ public class Transformer {
     }
 
     private static String preprocessYaml(String yaml) {
-        yaml = replaceStandaloneTemplates(yaml);  // level: mapping element
-        yaml = quoteInlineTemplates(yaml);         // level: scalar value
+        yaml = replaceStandaloneTemplates(yaml);
+        yaml = quoteInlineTemplates(yaml);
         return yaml;
     }
 
     private static String replaceStandaloneTemplates(String yaml) {
-        // Любая строка, которая целиком состоит из {{ ... }}, с сохранением отступа
+        // Any line that consists entirely of {{ ... }}, preserving indentation
         return yaml.replaceAll(
                 "(?m)^(\\s*)\\{\\{[^\\n]*}}\\s*$",
                 "$1__helm_standalone_placeholder__: '__helm__'"
@@ -125,30 +127,25 @@ public class Transformer {
     private static String quoteInlineTemplates(String yaml) {
         Pattern p = Pattern.compile(
                 "(?m)^([ \\t]*[^:#\\n]+:)[ \\t]*" +          // key:
-                "(?![ \\t]*['\"])"+                          // value не начинается с кавычки (с учётом пробелов)
-                "([^\\n]*\\{\\{[^\\n]+}}[^\\n]*)$"           // value содержит хотя бы один {{ ... }}
+                "(?![ \\t]*['\"])"+                          // The value does not start with a quote (including leading spaces)
+                "([^\\n]*\\{\\{[^\\n]+}}[^\\n]*)$"           // The value contains at least one {{ ... }}
         );
 
         Matcher m = p.matcher(yaml);
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
 
         while (m.find()) {
             String keyPart = m.group(1);
             String valuePart = m.group(2).trim();
 
-            // Не трогаем значения, которые выглядят как flow-списки: ["{{ ... }}"]
             if (valuePart.indexOf('[') >= 0 || valuePart.indexOf(']') >= 0) {
                 m.appendReplacement(sb, Matcher.quoteReplacement(m.group(0)));
                 continue;
             }
 
-            // YAML single-quoted scalar: '...' c экранированием ' -> ''
             String quotedValue = "'" + valuePart.replace("'", "''") + "'";
 
-            m.appendReplacement(
-                    sb,
-                    Matcher.quoteReplacement(keyPart + " " + quotedValue)
-            );
+            m.appendReplacement(sb, Matcher.quoteReplacement(keyPart + " " + quotedValue));
         }
 
         m.appendTail(sb);
@@ -156,7 +153,7 @@ public class Transformer {
     }
 
     private boolean isMeshResource(JsonNode apiVersion, JsonNode kind) {
-        return "core.netcracker.com/v1".equals(apiVersion.asText()) && "Mesh".equals(kind.asText());
+        return CORE_NETCRACKER_COM_API_VERSION.equals(apiVersion.asText()) && MESH_KIND.equals(kind.asText());
     }
 
     private void validateResource(Resource resource) {
