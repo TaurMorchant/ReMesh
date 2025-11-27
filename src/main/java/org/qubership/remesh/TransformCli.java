@@ -23,7 +23,7 @@ public class TransformCli implements Callable<Integer> {
             return 1;
         }
 
-        new Transformer().transform(dir);
+        new TransformerService().transform(dir);
 
         return 0;
     }
