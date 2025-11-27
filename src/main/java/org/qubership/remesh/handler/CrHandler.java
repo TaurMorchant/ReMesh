@@ -1,10 +1,11 @@
 package org.qubership.remesh.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.qubership.remesh.dto.gatewayapi.Resource;
 
-import java.nio.file.Path;
+import java.util.List;
 
 public interface CrHandler {
     String getKind();
-    void handle(JsonNode node, Path outputFil);
+    List<Resource> handle(JsonNode node);
 }

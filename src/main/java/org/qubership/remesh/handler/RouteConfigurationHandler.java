@@ -1,57 +1,48 @@
 package org.qubership.remesh.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.qubership.remesh.dto.*;
+import org.qubership.remesh.dto.HeaderDefinition;
+import org.qubership.remesh.dto.HeaderMatcher;
+import org.qubership.remesh.dto.Metadata;
+import org.qubership.remesh.dto.RouteConfig;
+import org.qubership.remesh.dto.RouteConfigurationYaml;
+import org.qubership.remesh.dto.RouteDestination;
+import org.qubership.remesh.dto.RouteMatch;
+import org.qubership.remesh.dto.RouteV3;
+import org.qubership.remesh.dto.Rule;
+import org.qubership.remesh.dto.VirtualService;
 import org.qubership.remesh.dto.gatewayapi.HttpRoute;
 import org.qubership.remesh.dto.gatewayapi.Resource;
 import org.qubership.remesh.util.EndpointDTO;
 import org.qubership.remesh.util.EndpointParser;
 import org.qubership.remesh.util.ObjectMapperProvider;
-import org.qubership.remesh.validation.JsonSchemaValidator;
 
-import java.io.Writer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 @Slf4j
 public class RouteConfigurationHandler implements CrHandler {
-    private static final ObjectMapper OBJECT_MAPPER = ObjectMapperProvider.getMapper();
-    private static final Pattern API_VERSION_SUFFIX = Pattern.compile("/v\\w+$");
-
     @Override
     public String getKind() {
         return "RouteConfiguration";
     }
 
     @Override
-    public void handle(JsonNode node, Path outputFile) {
+    public List<Resource> handle(JsonNode node) {
         try {
-            RouteConfigurationYaml original = OBJECT_MAPPER.treeToValue(node, RouteConfigurationYaml.class);
+            List<Resource> result = new ArrayList<>();
 
-            List<HttpRoute> httpRoutes = new ArrayList<>();
+            RouteConfigurationYaml original = ObjectMapperProvider.getMapper().treeToValue(node, RouteConfigurationYaml.class);
 
             if (original.getSpec() != null && original.getSpec().getVirtualServices() != null) {
                 for (VirtualService vs : original.getSpec().getVirtualServices()) {
                     HttpRoute httpRoute = toHttpRoute(original, vs);
-                    httpRoutes.add(httpRoute);
+                    result.add(httpRoute);
                 }
             }
-
-            try (Writer writer = Files.newBufferedWriter(outputFile)) {
-                for (HttpRoute hr : httpRoutes) {
-                    JsonNode httpRouteNode = OBJECT_MAPPER.valueToTree(hr);
-                    log.info("    Start validating HttpRoute {}", hr.getMetadata().getName());
-                    String schemaFileName = schemaFileName(hr);
-                    JsonSchemaValidator.validate(httpRouteNode, schemaFileName);
-
-                    writer.write("---\n");
-                    writer.write(OBJECT_MAPPER.writeValueAsString(hr));
-                }
-            }
+            return result;
         }
         catch (Exception e) {
             throw new RuntimeException(e);
@@ -63,15 +54,6 @@ public class RouteConfigurationHandler implements CrHandler {
         httpRoute.setMetadata(metadataToHttpRouteMetadata(routeConfiguration.getMetadata()));
         httpRoute.setSpec(virtualServiceToHttpRouteSpec(routeConfiguration, virtualService));
         return httpRoute;
-    }
-
-    private String schemaFileName(Resource resource) {
-        String apiVersion = Optional.ofNullable(resource.getApiVersion()).orElse("");
-        String kind = Optional.ofNullable(resource.getKind()).orElse("");
-
-        String baseApiVersion = API_VERSION_SUFFIX.matcher(apiVersion).replaceFirst("");
-
-        return (baseApiVersion + "_" + kind).toLowerCase() + ".yaml";
     }
 
     private HttpRoute.Metadata metadataToHttpRouteMetadata(Metadata metadata) {
