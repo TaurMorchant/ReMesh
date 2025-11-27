@@ -1,7 +1,9 @@
 package org.qubership.remesh.dto.gatewayapi;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.qubership.remesh.serialization.ExtendedIntegerSerializer;
 
 import java.util.List;
 import java.util.Map;
@@ -17,9 +19,6 @@ public class HttpRoute implements Resource {
     private HttpRouteSpec spec;
     private Status status;
 
-    /* =========================
-       Metadata
-       ========================= */
     @Data
     @NoArgsConstructor
     public static class Metadata {
@@ -29,9 +28,6 @@ public class HttpRoute implements Resource {
         private Map<String, String> annotations;
     }
 
-    /* =========================
-       Spec
-       ========================= */
     @Data
     @NoArgsConstructor
     public static class HttpRouteSpec {
@@ -40,9 +36,6 @@ public class HttpRoute implements Resource {
         private List<Rule> rules;
     }
 
-    /* =========================
-       ParentRef
-       ========================= */
     @Data
     @NoArgsConstructor
     public static class ParentReference {
@@ -51,12 +44,10 @@ public class HttpRoute implements Resource {
         private String name;
         private String namespace;
         private String sectionName;
-        private Integer port;
+        @JsonSerialize(using = ExtendedIntegerSerializer.class)
+        private String port;
     }
 
-    /* =========================
-       Rules
-       ========================= */
     @Data
     @NoArgsConstructor
     public static class Rule {
@@ -66,9 +57,6 @@ public class HttpRoute implements Resource {
         private List<BackendRef> backendRefs;
     }
 
-    /* =========================
-       Match
-       ========================= */
     @Data
     @NoArgsConstructor
     public static class Match {
@@ -117,15 +105,10 @@ public class HttpRoute implements Resource {
         RegularExpression
     }
 
-    /* =========================
-       Filters
-       ========================= */
     @Data
     @NoArgsConstructor
     public static class Filter {
         private FilterType type;
-
-        // exactly one should be set
         private RequestHeaderModifier requestHeaderModifier;
         private ResponseHeaderModifier responseHeaderModifier;
         private RequestRedirect requestRedirect;
@@ -167,8 +150,10 @@ public class HttpRoute implements Resource {
     public static class RequestRedirect {
         private String scheme;
         private String hostname;
-        private Integer port;
-        private Integer statusCode;
+        @JsonSerialize(using = ExtendedIntegerSerializer.class)
+        private String port;
+        @JsonSerialize(using = ExtendedIntegerSerializer.class)
+        private String statusCode;
         private PathRewrite path;
     }
 
@@ -192,9 +177,6 @@ public class HttpRoute implements Resource {
         ReplacePrefixMatch
     }
 
-    /* =========================
-       BackendRefs
-       ========================= */
     @Data
     @NoArgsConstructor
     public static class BackendRef {
@@ -202,13 +184,12 @@ public class HttpRoute implements Resource {
         private String kind;
         private String name;
         private String namespace;
+        @JsonSerialize(using = ExtendedIntegerSerializer.class)
         private String port;
-        private Integer weight;
+        @JsonSerialize(using = ExtendedIntegerSerializer.class)
+        private String weight;
     }
 
-    /* =========================
-       Status
-       ========================= */
     @Data
     @NoArgsConstructor
     public static class Status {
@@ -225,8 +206,8 @@ public class HttpRoute implements Resource {
     @Data
     @NoArgsConstructor
     public static class RouteCondition {
-        private String type;    // Accepted, ResolvedRefs, ...
-        private String status;  // True / False / Unknown
+        private String type;
+        private String status;
         private String reason;
         private String message;
     }
