@@ -8,10 +8,10 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class RoutingConfigRequestV3 {
-    private String namespace; //not used
+//    private String namespace; //not used
     private List<String> gateways;
-    private Integer listenerPort; //not used
-    private Boolean tlsSupported; //not used
+//    private Integer listenerPort; //not used
+//    private Boolean tlsSupported; //not used
     private List<VirtualService> virtualServices;
-    private Boolean overridden; //not used
+//    private Boolean overridden; //not used
 }

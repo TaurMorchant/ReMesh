@@ -1,14 +1,13 @@
 package org.qubership.remesh.handler;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.qubership.remesh.dto.*;
 import org.qubership.remesh.dto.gatewayapi.HttpRoute;
 import org.qubership.remesh.util.EndpointDTO;
 import org.qubership.remesh.util.EndpointParser;
+import org.qubership.remesh.util.ObjectMapperProvider;
 import org.qubership.remesh.validation.HttpRouteValidator;
 
 import java.io.Writer;
@@ -19,9 +18,7 @@ import java.util.regex.Pattern;
 
 @Slf4j
 public class RouteConfigurationHandler implements CrHandler {
-
-    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory())
-            .setSerializationInclusion(JsonInclude.Include.NON_EMPTY);
+    private static final ObjectMapper OBJECT_MAPPER = ObjectMapperProvider.getMapper();
 
     @Override
     public String getKind() {
@@ -31,7 +28,7 @@ public class RouteConfigurationHandler implements CrHandler {
     @Override
     public void handle(JsonNode node, Path outputFile) {
         try {
-            RouteConfigurationYaml original = YAML.treeToValue(node, RouteConfigurationYaml.class);
+            RouteConfigurationYaml original = OBJECT_MAPPER.treeToValue(node, RouteConfigurationYaml.class);
 
             List<HttpRoute> httpRoutes = new ArrayList<>();
 
@@ -44,12 +41,12 @@ public class RouteConfigurationHandler implements CrHandler {
 
             try (Writer writer = Files.newBufferedWriter(outputFile)) {
                 for (HttpRoute hr : httpRoutes) {
-                    JsonNode httpRouteNode = YAML.valueToTree(hr);
+                    JsonNode httpRouteNode = OBJECT_MAPPER.valueToTree(hr);
                     log.info("Validate HttpRoute {}", hr.getMetadata().getName());
                     HttpRouteValidator.validate(httpRouteNode);
 
                     writer.write("---\n");
-                    writer.write(YAML.writeValueAsString(hr));
+                    writer.write(OBJECT_MAPPER.writeValueAsString(hr));
                 }
             }
         }
@@ -110,12 +107,12 @@ public class RouteConfigurationHandler implements CrHandler {
         if (routeConfig != null && routeConfig.getRoutes() != null) {
             for (RouteV3 routeV3 : routeConfig.getRoutes()) {
                 for (Rule rule : routeV3.getRules()) {
-                    if (rule.getDeny() != null && Boolean.TRUE.equals(rule.getDeny())) {
-                        continue;
-                    }
-                    if (rule.getAllowed() != null && Boolean.FALSE.equals(rule.getAllowed())) {
-                        continue;
-                    }
+//                    if (rule.getDeny() != null && Boolean.TRUE.equals(rule.getDeny())) {
+//                        continue;
+//                    }
+//                    if (rule.getAllowed() != null && Boolean.FALSE.equals(rule.getAllowed())) {
+//                        continue;
+//                    }
 
                     HttpRoute.Rule newRule = new HttpRoute.Rule();
 
