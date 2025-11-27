@@ -5,10 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.qubership.remesh.dto.*;
 import org.qubership.remesh.dto.gatewayapi.HttpRoute;
+import org.qubership.remesh.dto.gatewayapi.Resource;
 import org.qubership.remesh.util.EndpointDTO;
 import org.qubership.remesh.util.EndpointParser;
 import org.qubership.remesh.util.ObjectMapperProvider;
-import org.qubership.remesh.validation.HttpRouteValidator;
+import org.qubership.remesh.validation.JsonSchemaValidator;
 
 import java.io.Writer;
 import java.nio.file.Files;
@@ -19,6 +20,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public class RouteConfigurationHandler implements CrHandler {
     private static final ObjectMapper OBJECT_MAPPER = ObjectMapperProvider.getMapper();
+    private static final Pattern API_VERSION_SUFFIX = Pattern.compile("/v\\w+$");
 
     @Override
     public String getKind() {
@@ -42,8 +44,9 @@ public class RouteConfigurationHandler implements CrHandler {
             try (Writer writer = Files.newBufferedWriter(outputFile)) {
                 for (HttpRoute hr : httpRoutes) {
                     JsonNode httpRouteNode = OBJECT_MAPPER.valueToTree(hr);
-                    log.info("Validate HttpRoute {}", hr.getMetadata().getName());
-                    HttpRouteValidator.validate(httpRouteNode);
+                    log.info("    Start validating HttpRoute {}", hr.getMetadata().getName());
+                    String schemaFileName = schemaFileName(hr);
+                    JsonSchemaValidator.validate(httpRouteNode, schemaFileName);
 
                     writer.write("---\n");
                     writer.write(OBJECT_MAPPER.writeValueAsString(hr));
@@ -60,6 +63,15 @@ public class RouteConfigurationHandler implements CrHandler {
         httpRoute.setMetadata(metadataToHttpRouteMetadata(routeConfiguration.getMetadata()));
         httpRoute.setSpec(virtualServiceToHttpRouteSpec(routeConfiguration, virtualService));
         return httpRoute;
+    }
+
+    private String schemaFileName(Resource resource) {
+        String apiVersion = Optional.ofNullable(resource.getApiVersion()).orElse("");
+        String kind = Optional.ofNullable(resource.getKind()).orElse("");
+
+        String baseApiVersion = API_VERSION_SUFFIX.matcher(apiVersion).replaceFirst("");
+
+        return (baseApiVersion + "_" + kind).toLowerCase() + ".yaml";
     }
 
     private HttpRoute.Metadata metadataToHttpRouteMetadata(Metadata metadata) {

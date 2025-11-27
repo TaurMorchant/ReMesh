@@ -37,7 +37,7 @@ public class ObjectMapperProvider {
 
                 String path = buildPath(p, propertyName);
 
-                log.warn("Unknown YAML property '{}' for type '{}', location: {}",
+                log.warn("    Unknown YAML property '{}' for type '{}', location: {}",
                         propertyName,
                         targetClass.getSimpleName(),
                         path);
