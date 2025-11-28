@@ -43,10 +43,6 @@ public class TransformerService {
         this.mapper = mapper;
     }
 
-    public void transform(Path dir) throws IOException {
-        transform(dir, true);
-    }
-
     public void transform(Path dir, boolean validate) throws IOException {
         log.info("Start transforming in dir '{}'", dir);
         try (Stream<Path> stream = Files.walk(dir)) {
@@ -63,10 +59,17 @@ public class TransformerService {
 
     void processFile(Path file, boolean validate) {
         log.info("=== Processing file '{}' ===", file);
-        Path outputFile = file.resolveSibling(file.getFileName().toString() + "_new");
+        Path oldFile = file.resolveSibling(file.getFileName().toString() + "_old");
 
-        try (Writer writer = Files.newBufferedWriter(outputFile)) {
-            String content = Files.readString(file, StandardCharsets.UTF_8);
+        try {
+            Files.move(file, oldFile);
+        } catch (IOException e) {
+            log.error("Failed to rename original file '{}'", file, e);
+            return;
+        }
+
+        try (Writer writer = Files.newBufferedWriter(file)) {
+            String content = Files.readString(oldFile, StandardCharsets.UTF_8);
             String[] documents = content.split(FRAGMENT_DELIMITER);
 
             int fragmentIndex = 0;
@@ -104,6 +107,6 @@ public class TransformerService {
             return;
         }
 
-        log.info("=== Output file is '{}' ===\n", outputFile);
+        log.info("=== Output file is '{}' ===\n", file);
     }
 }

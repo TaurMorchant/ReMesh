@@ -46,7 +46,9 @@ class TransformerTest {
 
         transformerService.transform(dir, true);
 
-        Path output = dir.resolve("resource.yaml_new");
+        Path oldFile = dir.resolve("resource.yaml_old");
+        Path output = dir.resolve("resource.yaml");
+        assertTrue(Files.exists(oldFile));
         assertTrue(Files.exists(output));
         String content = Files.readString(output);
         assertTrue(content.contains("DemoResource"));
