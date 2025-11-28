@@ -44,7 +44,7 @@ class TransformerTest {
 
         TransformerService transformerService = new TransformerService(preprocessor, router, validator, mapper);
 
-        transformerService.transform(dir);
+        transformerService.transform(dir, true);
 
         Path output = dir.resolve("resource.yaml_new");
         assertTrue(Files.exists(output));

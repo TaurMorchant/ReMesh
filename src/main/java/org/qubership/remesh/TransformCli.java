@@ -15,6 +15,10 @@ public class TransformCli implements Callable<Integer> {
     @CommandLine.Option(names = {"-d", "--dir"}, description = "Dir to process", defaultValue = ".")
     private Path directory;
 
+    @SuppressWarnings("unused")
+    @CommandLine.Option(names = {"-v", "--validate"}, description = "Run validation", defaultValue = "false")
+    private boolean validationEnabled;
+
     @Override
     public Integer call() throws Exception {
         Path dir = directory != null ? directory : Path.of(".");
@@ -23,7 +27,7 @@ public class TransformCli implements Callable<Integer> {
             return 1;
         }
 
-        new TransformerService().transform(dir);
+        new TransformerService().transform(dir, validationEnabled);
 
         return 0;
     }

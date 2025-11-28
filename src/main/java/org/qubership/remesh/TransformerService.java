@@ -44,11 +44,15 @@ public class TransformerService {
     }
 
     public void transform(Path dir) throws IOException {
+        transform(dir, true);
+    }
+
+    public void transform(Path dir, boolean validate) throws IOException {
         log.info("Start transforming in dir '{}'", dir);
         try (Stream<Path> stream = Files.walk(dir)) {
             stream.filter(Files::isRegularFile)
                     .filter(this::isYaml)
-                    .forEach(this::processFile);
+                    .forEach(file -> processFile(file, validate));
         }
     }
 
@@ -57,7 +61,7 @@ public class TransformerService {
         return name.endsWith(".yaml") || name.endsWith(".yml");
     }
 
-    void processFile(Path file) {
+    void processFile(Path file, boolean validate) {
         log.info("=== Processing file '{}' ===", file);
         Path outputFile = file.resolveSibling(file.getFileName().toString() + "_new");
 
@@ -81,7 +85,9 @@ public class TransformerService {
                 }
 
                 for (Resource resource : resources) {
-                    resourceValidator.validateResource(resource);
+                    if (validate) {
+                        resourceValidator.validateResource(resource);
+                    }
                     writer.write("---\n");
                     writer.write(mapper.writeValueAsString(resource));
                 }
