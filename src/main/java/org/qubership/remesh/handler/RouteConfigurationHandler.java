@@ -60,12 +60,14 @@ public class RouteConfigurationHandler implements CrHandler {
     }
 
     private HttpRoute.Metadata metadataToHttpRouteMetadata(Metadata metadata) {
+        if (metadata == null) {
+            return null;
+        }
+
         HttpRoute.Metadata result = new HttpRoute.Metadata();
         result.setName(safeName(metadata));
-        if (metadata != null) {
-            result.setNamespace(metadata.getNamespace());
-            result.setLabels(metadata.getLabels());
-        }
+        result.setNamespace(metadata.getNamespace());
+        result.setLabels(metadata.getLabels());
         return result;
     }
 
