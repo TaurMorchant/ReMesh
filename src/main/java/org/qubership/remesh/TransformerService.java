@@ -69,27 +69,34 @@ public class TransformerService {
             String content = Files.readString(file, StandardCharsets.UTF_8);
             String[] documents = content.split(FRAGMENT_DELIMITER);
 
+            int fragmentIndex = 0;
             for (String rawDoc : documents) {
                 if (rawDoc == null || rawDoc.isBlank()) {
                     continue;
                 }
 
-                JsonNode node = yamlPreprocessor.readAsJsonNode(rawDoc);
-                if (node == null) {
-                    continue;
-                }
-
-                List<Resource> resources = meshResourceRouter.route(node);
-                if (resources == null || resources.isEmpty()) {
-                    continue;
-                }
-
-                for (Resource resource : resources) {
-                    if (validate) {
-                        resourceValidator.validateResource(resource);
+                fragmentIndex++;
+                log.info("--- Start processing fragment {} in file '{}'", fragmentIndex, file);
+                try {
+                    JsonNode node = yamlPreprocessor.readAsJsonNode(rawDoc);
+                    if (node == null) {
+                        continue;
                     }
-                    writer.write("---\n");
-                    writer.write(mapper.writeValueAsString(resource));
+
+                    List<Resource> resources = meshResourceRouter.route(node);
+                    if (resources == null || resources.isEmpty()) {
+                        continue;
+                    }
+
+                    for (Resource resource : resources) {
+                        if (validate) {
+                            resourceValidator.validateResource(resource);
+                        }
+                        writer.write("---\n");
+                        writer.write(mapper.writeValueAsString(resource));
+                    }
+                } finally {
+                    log.info("--- Finished processing fragment {} in file '{}'\n", fragmentIndex, file);
                 }
             }
 
@@ -98,6 +105,6 @@ public class TransformerService {
             return;
         }
 
-        log.info("=== Output file is '{}' ===", outputFile);
+        log.info("=== Output file is '{}' ===\n", outputFile);
     }
 }

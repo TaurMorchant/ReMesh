@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 public class RouteConfigurationYaml {
     private String apiVersion;
     private String kind;
+    private String subKind;
     private Metadata metadata;
     private RoutingConfigRequestV3 spec;
 }

@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class VirtualService {
-//    private String name; //not used
+    private String name; //TODO need to check
     private List<String> hosts;
 //    private String rateLimit; //not used
     private List<HeaderDefinition> addHeaders;

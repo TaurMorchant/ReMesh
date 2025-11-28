@@ -13,7 +13,7 @@ public class Rule {
     private String hostRewrite;
     private List<HeaderDefinition> addHeaders;
     private List<String> removeHeaders;
-//    private Boolean allowed; //not used
+    private Boolean allowed; //TODO need to check
 //    private Long timeout; //not used
 //    private Long idleTimeout; //not used
 //    private StatefulSession statefulSession; //not used

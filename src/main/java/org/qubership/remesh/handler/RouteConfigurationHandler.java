@@ -107,9 +107,10 @@ public class RouteConfigurationHandler implements CrHandler {
 //                    if (rule.getDeny() != null && Boolean.TRUE.equals(rule.getDeny())) {
 //                        continue;
 //                    }
-//                    if (rule.getAllowed() != null && Boolean.FALSE.equals(rule.getAllowed())) {
-//                        continue;
-//                    }
+                    if (rule.getAllowed() != null && Boolean.FALSE.equals(rule.getAllowed())) {
+                        log.debug("    Rule is not allowed - skip");
+                        continue;
+                    }
 
                     HttpRoute.Rule newRule = new HttpRoute.Rule();
 
