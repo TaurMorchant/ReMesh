@@ -1,8 +1,8 @@
-# RouteConfiguration to Istio Entity Mapping
+# RouteConfiguration to Gateway API/Istio Entity Mapping
 
 ## Overview
 
-This document maps the RouteConfiguration custom resource entities to their corresponding Istio/Gateway API entities.
+This document maps the RouteConfiguration custom resource entities to their corresponding Gateway API/Istio entities.
 
 ## RouteConfiguration Class Diagram
 
