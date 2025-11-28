@@ -2,11 +2,9 @@ package org.qubership.remesh.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
-import org.qubership.remesh.dto.gatewayapi.Resource;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Function;
 
 @Slf4j
@@ -55,7 +53,7 @@ public class MeshResourceRouter {
         return resources;
     }
 
-    private boolean isMeshResource(JsonNode apiVersion, JsonNode kind) {
+    boolean isMeshResource(JsonNode apiVersion, JsonNode kind) {
         return CORE_NETCRACKER_COM_API_VERSION.equals(apiVersion.asText()) && MESH_KIND.equals(kind.asText());
     }
 }

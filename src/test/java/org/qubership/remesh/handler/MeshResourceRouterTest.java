@@ -2,7 +2,6 @@ package org.qubership.remesh.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
-import org.qubership.remesh.dto.gatewayapi.Resource;
 import org.qubership.remesh.util.ObjectMapperProvider;
 
 import java.util.List;

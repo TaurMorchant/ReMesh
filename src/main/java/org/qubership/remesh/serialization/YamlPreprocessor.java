@@ -34,8 +34,8 @@ public class YamlPreprocessor {
 
     public String replaceStandaloneTemplates(String yaml) {
         return yaml.replaceAll(
-                "(?m)^(\\s*)\\{\\{[^\\n]*}}\\s*$",
-                "$1__helm_standalone_placeholder__: '__helm__'"
+                "(?m)^(\\s*)(\\{\\{[^\\n]*}})\\s*$",
+                "$1# $2"
         );
     }
 

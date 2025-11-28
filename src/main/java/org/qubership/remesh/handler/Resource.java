@@ -1,4 +1,4 @@
-package org.qubership.remesh.dto.gatewayapi;
+package org.qubership.remesh.handler;
 
 public interface Resource {
     String getApiVersion();

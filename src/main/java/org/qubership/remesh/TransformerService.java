@@ -3,7 +3,7 @@ package org.qubership.remesh;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.qubership.remesh.dto.gatewayapi.Resource;
+import org.qubership.remesh.handler.Resource;
 import org.qubership.remesh.handler.MeshResourceRouter;
 import org.qubership.remesh.serialization.YamlPreprocessor;
 import org.qubership.remesh.util.ObjectMapperProvider;
@@ -92,7 +92,6 @@ public class TransformerService {
                         if (validate) {
                             resourceValidator.validateResource(resource);
                         }
-                        writer.write("---\n");
                         writer.write(mapper.writeValueAsString(resource));
                     }
                 } finally {

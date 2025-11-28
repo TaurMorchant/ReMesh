@@ -4,7 +4,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class EndpointParser {
-
     // scheme://host:port
     private static final Pattern ENDPOINT_PATTERN = Pattern.compile(
             "^(?<scheme>[a-zA-Z][a-zA-Z0-9+.-]*)://" +

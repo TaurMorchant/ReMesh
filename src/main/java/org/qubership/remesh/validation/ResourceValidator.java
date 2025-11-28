@@ -2,7 +2,7 @@ package org.qubership.remesh.validation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
-import org.qubership.remesh.dto.gatewayapi.Resource;
+import org.qubership.remesh.handler.Resource;
 import org.qubership.remesh.util.ObjectMapperProvider;
 
 import java.util.Optional;

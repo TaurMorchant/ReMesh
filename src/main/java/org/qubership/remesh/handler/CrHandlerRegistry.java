@@ -13,24 +13,24 @@ public final class CrHandlerRegistry {
     }
 
     private static Map<String, CrHandler> loadHandlers() {
-        Map<String, CrHandler> map = new HashMap<>();
+        Map<String, CrHandler> result = new HashMap<>();
 
         ServiceLoader<CrHandler> loader = ServiceLoader.load(CrHandler.class);
 
         for (CrHandler handler : loader) {
             String kind = handler.getKind();
 
-            if (map.containsKey(kind)) {
+            if (result.containsKey(kind)) {
                 throw new IllegalStateException(
                         "Duplicate CrHandler for kind: " + kind +
                         " (" + handler.getClass().getName() + ")"
                 );
             }
 
-            map.put(kind, handler);
+            result.put(kind, handler);
         }
 
-        return Collections.unmodifiableMap(map);
+        return Collections.unmodifiableMap(result);
     }
 
     private CrHandlerRegistry() {}

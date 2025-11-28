@@ -28,7 +28,7 @@ class YamlPreprocessorTest {
 
         String processed = preprocessor.replaceStandaloneTemplates(yaml);
 
-        assertEquals("__helm_standalone_placeholder__: '__helm__'", processed.trim());
+        assertEquals("# {{ something }}", processed.trim());
     }
 
     @Test

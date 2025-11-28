@@ -3,6 +3,7 @@ package org.qubership.remesh.dto.gatewayapi;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.qubership.remesh.handler.Resource;
 import org.qubership.remesh.serialization.ExtendedIntegerSerializer;
 
 import java.util.List;

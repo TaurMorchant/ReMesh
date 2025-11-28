@@ -1,7 +1,6 @@
 package org.qubership.remesh.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.qubership.remesh.dto.gatewayapi.Resource;
 
 import java.util.List;
 

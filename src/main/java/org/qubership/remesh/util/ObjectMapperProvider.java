@@ -23,7 +23,7 @@ public class ObjectMapperProvider {
         return MAPPER;
     }
 
-    private static ObjectMapper constructMapper() {
+    static ObjectMapper constructMapper() {
         ObjectMapper result = new ObjectMapper(new YAMLFactory());
 
         result.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -52,7 +52,7 @@ public class ObjectMapperProvider {
         return result;
     }
 
-    private static String buildPath(JsonParser p, String leafProperty) {
+    static String buildPath(JsonParser p, String leafProperty) {
         List<Object> segments = getPathSegments(p);
 
         StringBuilder sb = new StringBuilder();
@@ -76,7 +76,7 @@ public class ObjectMapperProvider {
         return sb.toString();
     }
 
-    private static List<Object> getPathSegments(JsonParser p) {
+    static List<Object> getPathSegments(JsonParser p) {
         List<Object> segments = new ArrayList<>();
 
         JsonStreamContext ctx = p.getParsingContext();

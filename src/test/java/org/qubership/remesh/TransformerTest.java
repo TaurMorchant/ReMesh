@@ -3,7 +3,7 @@ package org.qubership.remesh;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import org.qubership.remesh.dto.gatewayapi.Resource;
+import org.qubership.remesh.handler.Resource;
 import org.qubership.remesh.handler.MeshResourceRouter;
 import org.qubership.remesh.serialization.YamlPreprocessor;
 import org.qubership.remesh.util.ObjectMapperProvider;

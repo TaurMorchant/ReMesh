@@ -1,7 +1,7 @@
 package org.qubership.remesh.validation;
 
 import org.junit.jupiter.api.Test;
-import org.qubership.remesh.dto.gatewayapi.Resource;
+import org.qubership.remesh.handler.Resource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

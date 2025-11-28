@@ -27,12 +27,12 @@ public class ExtendedIntegerSerializer extends JsonSerializer<String> {
         }
     }
 
-    private boolean isHelmPlaceholder(String s) {
+    boolean isHelmPlaceholder(String s) {
         String trim = s.trim();
         return trim.startsWith("{{") && trim.endsWith("}}");
     }
 
-    private boolean isInteger(String s) {
+    boolean isInteger(String s) {
         try {
             Integer.parseInt(s);
             return true;

@@ -14,7 +14,6 @@ import org.qubership.remesh.dto.RouteV3;
 import org.qubership.remesh.dto.Rule;
 import org.qubership.remesh.dto.VirtualService;
 import org.qubership.remesh.dto.gatewayapi.HttpRoute;
-import org.qubership.remesh.dto.gatewayapi.Resource;
 import org.qubership.remesh.util.EndpointDTO;
 import org.qubership.remesh.util.EndpointParser;
 import org.qubership.remesh.util.ObjectMapperProvider;
@@ -144,7 +143,7 @@ public class RouteConfigurationHandler implements CrHandler {
         return result;
     }
 
-    private List<HttpRoute.Filter> getFilters(Rule rule, VirtualService virtualService) {
+    List<HttpRoute.Filter> getFilters(Rule rule, VirtualService virtualService) {
         List<HttpRoute.Filter> filters = new ArrayList<>();
 
         filters.addAll(calculateGeneralFilters(rule));
@@ -158,7 +157,7 @@ public class RouteConfigurationHandler implements CrHandler {
         // TODO: StatefulSession → DestinationRule (sticky sessions)
     }
 
-    private List<HttpRoute.Filter> calculateGeneralFilters(Rule rule) {
+    List<HttpRoute.Filter> calculateGeneralFilters(Rule rule) {
         List<HttpRoute.Filter> result = new ArrayList<>();
         if (rule.getPrefixRewrite() != null) {
             HttpRoute.Filter filter = new HttpRoute.Filter();
@@ -184,7 +183,7 @@ public class RouteConfigurationHandler implements CrHandler {
         return result;
     }
 
-    private List<HttpRoute.Filter> calculateHeaderFilter(Rule rule, VirtualService virtualService) {
+    List<HttpRoute.Filter> calculateHeaderFilter(Rule rule, VirtualService virtualService) {
         List<HttpRoute.Filter> result = new ArrayList<>();
 
         List<HeaderDefinition> addHeaders = new ArrayList<>();
@@ -213,7 +212,7 @@ public class RouteConfigurationHandler implements CrHandler {
         return result;
     }
 
-    private HttpRoute.RequestHeaderModifier getRequestHeaderModifier(List<HeaderDefinition> addHeaders, List<String> removeHeaders) {
+    HttpRoute.RequestHeaderModifier getRequestHeaderModifier(List<HeaderDefinition> addHeaders, List<String> removeHeaders) {
         HttpRoute.RequestHeaderModifier requestHeaderModifier = new HttpRoute.RequestHeaderModifier();
 
         List<HttpRoute.Header> add = new ArrayList<>();
@@ -230,7 +229,7 @@ public class RouteConfigurationHandler implements CrHandler {
         return requestHeaderModifier;
     }
 
-    private List<HttpRoute.ParentReference> gatewaysToParentReferences(RouteConfigurationYaml routeConfiguration) {
+    List<HttpRoute.ParentReference> gatewaysToParentReferences(RouteConfigurationYaml routeConfiguration) {
         List<HttpRoute.ParentReference> parentRefs = new ArrayList<>();
         if (routeConfiguration.getSpec() != null && routeConfiguration.getSpec().getGateways() != null) {
             for (String gateway : routeConfiguration.getSpec().getGateways()) {
@@ -244,7 +243,7 @@ public class RouteConfigurationHandler implements CrHandler {
         return parentRefs;
     }
 
-    private HttpRoute.Match toMatch(RouteMatch match) {
+    HttpRoute.Match toMatch(RouteMatch match) {
         if (match == null) {
             return null;
         }
@@ -280,7 +279,7 @@ public class RouteConfigurationHandler implements CrHandler {
         return result;
     }
 
-    private List<HttpRoute.HeaderMatch> getHeaderMatches(List<HeaderMatcher> matches) {
+    List<HttpRoute.HeaderMatch> getHeaderMatches(List<HeaderMatcher> matches) {
         List<HttpRoute.HeaderMatch> headers = new ArrayList<>();
         for (HeaderMatcher headerMatcher : matches) {
             HttpRoute.HeaderMatch headerMatch = new HttpRoute.HeaderMatch();
@@ -317,7 +316,7 @@ public class RouteConfigurationHandler implements CrHandler {
         return headers;
     }
 
-    private HttpRoute.BackendRef toBackendRef(RouteDestination dst) {
+    HttpRoute.BackendRef toBackendRef(RouteDestination dst) {
         if (dst == null) {
             return null;
         }
@@ -325,8 +324,8 @@ public class RouteConfigurationHandler implements CrHandler {
 
         HttpRoute.BackendRef backendRef = new HttpRoute.BackendRef();
         backendRef.setKind("Service");
-        backendRef.setName(endpoint.getHost());
-        backendRef.setPort(endpoint.getPort());
+        backendRef.setName(endpoint.host());
+        backendRef.setPort(endpoint.port());
         // TODO: dst.TlsSupported / TlsEndpoint / HttpVersion / TlsConfigName → DestinationRule/Policy
 
         return backendRef;

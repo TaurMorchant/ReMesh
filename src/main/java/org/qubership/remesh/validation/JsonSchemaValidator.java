@@ -53,7 +53,7 @@ public final class JsonSchemaValidator {
         }
     }
 
-    private static JsonSchema loadSchema(String schemaFileName) {
+    static JsonSchema loadSchema(String schemaFileName) {
         String resourcePath = SCHEMAS_DIR + schemaFileName;
         try (InputStream is =
                      JsonSchemaValidator.class
@@ -86,7 +86,7 @@ public final class JsonSchemaValidator {
         }
     }
 
-    private static JsonSchemaFactory buildSchemaFactory() {
+    static JsonSchemaFactory buildSchemaFactory() {
         JsonSchemaFactory baseFactory =
                 JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V201909);
 
