@@ -1,5 +1,6 @@
 package org.qubership.remesh.handler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.qubership.remesh.dto.HeaderDefinition;
@@ -19,6 +20,7 @@ import org.qubership.remesh.util.EndpointParser;
 import org.qubership.remesh.util.ObjectMapperProvider;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -44,8 +46,9 @@ public class RouteConfigurationHandler implements CrHandler {
             }
             return result;
         }
-        catch (Exception e) {
-            throw new RuntimeException(e);
+        catch (IllegalArgumentException | JsonProcessingException e) {
+            log.error("Cannot deserialize RouteConfiguration", e);
+            return Collections.emptyList();
         }
     }
 
@@ -287,11 +290,11 @@ public class RouteConfigurationHandler implements CrHandler {
                 headerMatch.setValue(headerMatcher.getSafeRegexMatch());
             } else if (headerMatcher.getPrefixMatch() != null) {
                 headerMatch.setType(HttpRoute.HeaderMatchType.RegularExpression);
-                headerMatch.setValue("^" + Pattern.quote(headerMatcher.getSafeRegexMatch()) + ".*$");
+                headerMatch.setValue("^" + Pattern.quote(headerMatcher.getPrefixMatch()) + ".*$");
             }
             else if (headerMatcher.getSuffixMatch() != null) {
                 headerMatch.setType(HttpRoute.HeaderMatchType.RegularExpression);
-                headerMatch.setValue(".*" + Pattern.quote(headerMatcher.getSafeRegexMatch()) + "$");
+                headerMatch.setValue(".*" + Pattern.quote(headerMatcher.getSuffixMatch()) + "$");
             }
             else if (headerMatcher.isPresentMatch()) {
                 headerMatch.setType(HttpRoute.HeaderMatchType.RegularExpression);
@@ -303,7 +306,9 @@ public class RouteConfigurationHandler implements CrHandler {
                 log.warn("Header match {} is unsupported", headerMatch);
             }
 
-            headers.add(headerMatch);
+            if (headerMatch.getType() != null) {
+                headers.add(headerMatch);
+            }
         }
         return headers;
     }

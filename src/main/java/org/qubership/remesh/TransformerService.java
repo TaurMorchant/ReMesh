@@ -19,6 +19,7 @@ import java.util.stream.Stream;
 
 @Slf4j
 public class TransformerService {
+    public static final String FRAGMENT_DELIMITER = "(?m)^---\\s*$";
     private final YamlPreprocessor yamlPreprocessor;
     private final MeshResourceRouter meshResourceRouter;
     private final ResourceValidator resourceValidator;
@@ -62,7 +63,7 @@ public class TransformerService {
 
         try (Writer writer = Files.newBufferedWriter(outputFile)) {
             String content = Files.readString(file, StandardCharsets.UTF_8);
-            String[] documents = content.split("(?m)^---\\s*$");
+            String[] documents = content.split(FRAGMENT_DELIMITER);
 
             for (String rawDoc : documents) {
                 if (rawDoc == null || rawDoc.isBlank()) {
@@ -87,7 +88,8 @@ public class TransformerService {
             }
 
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            log.error("Failed to process file '{}'", file, e);
+            return;
         }
 
         log.info("=== Output file is '{}' ===", outputFile);
