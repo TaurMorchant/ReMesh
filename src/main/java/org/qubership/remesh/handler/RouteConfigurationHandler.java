@@ -128,7 +128,7 @@ public class RouteConfigurationHandler implements CrHandler {
                     List<HttpRoute.Filter> filters = getFilters(rule, virtualService);
                     newRule.setFilters(filters);
 
-                    // backendRefs из RouteDestination
+                    // backendRefs from RouteDestination
                     List<HttpRoute.BackendRef> backendRefs = new ArrayList<>();
                     HttpRoute.BackendRef backendRef = toBackendRef(routeV3.getDestination());
                     if (backendRef != null) {
