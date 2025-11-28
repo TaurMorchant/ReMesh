@@ -305,7 +305,7 @@ public class RouteConfigurationHandler implements CrHandler {
             }
             else
             {
-                //TODO VLLA остальные типы не поддерживаются в чистом виде
+                //TODO VLLA the rest types are not supported
                 log.warn("Header match {} is unsupported", headerMatch);
             }
 
