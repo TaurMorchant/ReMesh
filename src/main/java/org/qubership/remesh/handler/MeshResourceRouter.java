@@ -43,7 +43,7 @@ public class MeshResourceRouter {
 
         CrHandler handler = handlerProvider.apply(subKind.asText());
         if (handler == null) {
-            log.warn("    Handler not found for kind {}", Optional.of(subKind.asText()));
+            log.warn("    Handler not found for kind {}", subKind.asText());
             return List.of();
         }
 

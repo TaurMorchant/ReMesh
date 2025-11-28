@@ -64,6 +64,7 @@ public class RouteConfigurationHandler implements CrHandler {
         result.setName(safeName(metadata));
         if (metadata != null) {
             result.setNamespace(metadata.getNamespace());
+            result.setLabels(metadata.getLabels());
         }
         return result;
     }
